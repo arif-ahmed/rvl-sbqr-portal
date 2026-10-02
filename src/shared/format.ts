@@ -39,3 +39,8 @@ export function periodName(period: string): string {
   const [year, month] = period.split('-')
   return `${MONTHS[Number(month) - 1]} ${year}`
 }
+
+/** '2026-09' -> 'Sep', for chart axis labels. */
+export function monthShort(period: string): string {
+  return MONTHS[Number(period.split('-')[1]) - 1].slice(0, 3)
+}

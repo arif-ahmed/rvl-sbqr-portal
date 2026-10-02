@@ -2,11 +2,15 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import type { Session } from '../../shared/auth/session'
 import { AppShell } from '../../shared/layout/app-shell'
 import { ComingSoon } from '../../shared/layout/coming-soon'
+import { AdjustmentsPage } from './adjustments/adjustments-page'
 import { InstitutionDetail } from './institutions/institution-detail'
 import { InstitutionsPage } from './institutions-page'
 import { staffNav } from './nav'
 import OnboardingPage from './onboarding/onboarding-page'
+import { OverviewPage } from './overview-page'
+import { PeriodsPage } from './periods/periods-page'
 import { RatesPage } from './rates/rates-page'
+import { ReportsPage } from './reports/reports-page'
 
 // RVL Admin and Finance screens. Reference: design/portal-prototype.html.
 // To build a screen: create it in this folder and swap it in for <ComingSoon /> below.
@@ -19,8 +23,12 @@ export default function StaffSurface({ session }: { session: Session }) {
     </AppShell>
   )
   const page = (to: string, label: string) => {
+    if (to === '/staff/overview') return <OverviewPage session={session} />
     if (to === '/staff/institutions') return <InstitutionsPage role={session.role} />
     if (to === '/staff/rates') return <RatesPage />
+    if (to === '/staff/periods') return <PeriodsPage session={session} />
+    if (to === '/staff/adjustments') return <AdjustmentsPage session={session} />
+    if (to === '/staff/reports') return <ReportsPage />
     return <ComingSoon title={label} />
   }
   return (
@@ -36,6 +44,7 @@ export default function StaffSurface({ session }: { session: Session }) {
       {session.role === 'admin' && <Route path="institutions/new" element={shell('New institution', <OnboardingPage />)} />}
       <Route path="institutions/:id" element={shell('Institution', <InstitutionDetail role={session.role} />)} />
       <Route path="institutions/:id/usage" element={shell('Institution', <InstitutionDetail role={session.role} tab="usage" />)} />
+      <Route path="institutions/:id/billing" element={shell('Institution', <InstitutionDetail role={session.role} tab="billing" />)} />
       <Route path="*" element={<Navigate to="/staff/overview" replace />} />
     </Routes>
   )

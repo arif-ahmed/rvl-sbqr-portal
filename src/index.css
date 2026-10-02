@@ -34,6 +34,10 @@
   --bad-bg: #fdeceb;
   --info: #1d5fb8;
   --info-bg: #e8f0fc;
+
+  /* Select caret (lucide chevron-down). Data URIs cannot read CSS variables, so each
+     theme repeats its --text-3 value inside the SVG stroke. */
+  --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2376827c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 [data-surface='fi'] {
@@ -70,6 +74,7 @@
     --bad-bg: #3d1c1b;
     --info: #7db2ff;
     --info-bg: #172a46;
+    --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2378857e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
   :root:not([data-theme='light'])[data-surface='fi'] {
     --accent: #6a9bff;
@@ -102,6 +107,7 @@
   --bad-bg: #3d1c1b;
   --info: #7db2ff;
   --info-bg: #172a46;
+  --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2378857e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 :root[data-theme='dark'][data-surface='fi'] {
   --accent: #6a9bff;
@@ -161,6 +167,15 @@ body {
 /* Money and counts: tabular digits so columns align. */
 .num {
   font-variant-numeric: tabular-nums;
+}
+
+/* Shared Select primitive (src/shared/ui/field.tsx): replaces the OS caret with the
+   design-system chevron. Space for it comes from the pr-9 on the primitive itself. */
+.select-caret {
+  background-image: var(--caret);
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem 1rem;
 }
 
 :focus-visible {

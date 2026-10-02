@@ -8,6 +8,7 @@ import { typeLabel } from '../onboarding/institution-types'
 import { InstitutionUsageTab } from '../usage/institution-usage'
 import { ActionButtons } from './action-buttons'
 import { daysUntil, setupItems } from './actions'
+import { InstitutionBillingTab } from './institution-billing'
 import { useInstitutions } from './store'
 import type { Institution } from './types'
 import { useInstitutionActions } from './use-institution-actions'
@@ -33,16 +34,16 @@ function keyText(i: Institution) {
   return i.keyMode === 'Generate' ? 'Generated and held by the platform.' : 'Existing key provided by the institution.'
 }
 
-/** One institution: profile, setup progress, credentials, certificate and signing key. UI only. */
-export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?: 'overview' | 'usage' }) {
+/** One institution: profile, setup progress, credentials, certificate, signing key and billing. UI only. */
+export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?: 'overview' | 'usage' | 'billing' }) {
   const { id } = useParams()
   const institutions = useInstitutions()
   const { run, dialogs } = useInstitutionActions()
   const inst = institutions.find((i) => i.id === id)
   if (!inst) return <Navigate to="/staff/institutions" replace />
-  // A pending institution cannot have usage yet, so it has no Usage tab.
+  // A pending institution cannot have usage yet, so it has no Usage or Billing tab.
   const hasUsage = inst.status !== 'Pending'
-  if (tab === 'usage' && !hasUsage) return <Navigate to={`/staff/institutions/${inst.id}`} replace />
+  if ((tab === 'usage' || tab === 'billing') && !hasUsage) return <Navigate to={`/staff/institutions/${inst.id}`} replace />
 
   const canManage = role === 'admin'
   const items = setupItems(inst)
@@ -74,6 +75,7 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
           {[
             { label: 'Overview', to: `/staff/institutions/${inst.id}`, on: tab === 'overview' },
             { label: 'Usage', to: `/staff/institutions/${inst.id}/usage`, on: tab === 'usage' },
+            { label: 'Billing', to: `/staff/institutions/${inst.id}/billing`, on: tab === 'billing' },
           ].map((t) => (
             <Link
               key={t.label}
@@ -89,6 +91,8 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
 
       {tab === 'usage' ? (
         <InstitutionUsageTab institutionId={inst.id} />
+      ) : tab === 'billing' ? (
+        <InstitutionBillingTab institutionId={inst.id} institutionName={inst.name} />
       ) : (
         <>
       {inst.status === 'Terminated' && <Banner tone="info" title="Closed permanently">This institution was terminated. Its key and credentials no longer work.</Banner>}

@@ -27,8 +27,10 @@ const control =
 export const Input = ({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) => (
   <input className={cn(control, 'h-10', className)} {...p} />
 )
+// The OS caret ignores the control's padding and looks cramped; the design-system
+// chevron lives in index.css (.select-caret) and pr-9 reserves its space.
 export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => (
-  <select className={cn(control, 'h-10', className)} {...p} />
+  <select className={cn(control, 'h-10 appearance-none pr-9 select-caret', className)} {...p} />
 )
 export const Textarea = ({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
   <textarea className={cn(control, 'min-h-24 py-2.5', className)} {...p} />
