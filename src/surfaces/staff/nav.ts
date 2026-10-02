@@ -1,18 +1,21 @@
-import { Building2, CreditCard, FileText, Flag, Home, KeyRound, PlusCircle, QrCode } from 'lucide-react'
+import { BarChart3, Building2, CreditCard, FileText, Flag, Home, KeyRound, PlusCircle, QrCode } from 'lucide-react'
 import type { Role } from '../../shared/auth/session'
 import type { NavItem } from '../../shared/layout/app-shell'
 
 // One list drives both the sidebar and the routes, so they cannot drift apart.
-const admin: NavItem[] = [
+// `stuck` is the number of undelivered usage events, shown as a badge on Usage.
+const admin = (stuck: number): NavItem[] => [
   { to: '/staff/overview', label: 'Overview', icon: Home },
   { to: '/staff/institutions', label: 'Institutions', icon: Building2 },
+  { to: '/staff/usage', label: 'Usage', icon: BarChart3, badge: stuck },
   { to: '/staff/keys', label: 'Crypto keys', icon: KeyRound },
   { to: '/staff/inspector', label: 'QR inspector', icon: QrCode },
 ]
 
-const finance: NavItem[] = [
+const finance = (stuck: number): NavItem[] => [
   { to: '/staff/overview', label: 'Overview', icon: Home },
   { to: '/staff/institutions', label: 'Institutions', icon: Building2 },
+  { to: '/staff/usage', label: 'Usage', icon: BarChart3, badge: stuck },
   { heading: 'Billing' },
   { to: '/staff/rates', label: 'Rate cards', icon: CreditCard },
   { to: '/staff/periods', label: 'Billing periods', icon: FileText },
@@ -20,4 +23,4 @@ const finance: NavItem[] = [
   { to: '/staff/reports', label: 'Reports', icon: Flag },
 ]
 
-export const staffNav = (role: Role): NavItem[] => (role === 'finance' ? finance : admin)
+export const staffNav = (role: Role, stuck = 0): NavItem[] => (role === 'finance' ? finance(stuck) : admin(stuck))

@@ -3,6 +3,7 @@ import type { Session } from '../../shared/auth/session'
 import { AppShell } from '../../shared/layout/app-shell'
 import { ComingSoon } from '../../shared/layout/coming-soon'
 import { fiNav } from './nav'
+import { UsagePage } from './usage-page'
 
 // Financial-institution screens. Reference: design/portal-prototype.html.
 // To build a screen: create it in this folder and swap it in for <ComingSoon /> below.
@@ -16,7 +17,7 @@ export default function FiSurface({ session }: { session: Session }) {
           path={p.to.replace('/fi/', '')}
           element={
             <AppShell surface="fi" session={session} nav={fiNav} title={p.label}>
-              <ComingSoon title={p.label} />
+              {p.to === '/fi/usage' ? <UsagePage /> : <ComingSoon title={p.label} />}
             </AppShell>
           }
         />

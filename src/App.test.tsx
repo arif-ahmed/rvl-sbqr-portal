@@ -63,6 +63,11 @@ describe('App', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/staff/institutions'))
   })
 
+  it.each(['Admin', 'Finance', 'Institution'] as const)('shows the Usage menu to %s', async (label) => {
+    await signInAs(label)
+    expect(await screen.findByRole('link', { name: /^Usage/ })).toBeInTheDocument()
+  })
+
   it('keeps an institution user out of staff routes', async () => {
     await signInAs('Institution')
     expect(await screen.findByRole('link', { name: 'Statements' })).toBeInTheDocument()
