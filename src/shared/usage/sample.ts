@@ -17,9 +17,6 @@ const refPrefixes = ['INV', 'POS', 'ORD', 'BILL']
 /** The Active institutions in the sample list, and the one the sample FI user belongs to. */
 export const sampleInstitutionIds = ['inst-1', 'inst-2', 'inst-3']
 export const sampleFiInstitutionId = 'inst-1'
-/** Institutions with no rate card: usage is recorded, but no statement is produced. Sample flag until Billing exists. */
-export const sampleNoRateCard = ['inst-3']
-
 function build(): UsageEvent[] {
   const rand = seeded(20261002)
   const events: UsageEvent[] = []

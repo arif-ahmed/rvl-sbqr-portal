@@ -4,7 +4,7 @@ Web portal for Secure Bangla QR (SBQR), by Relief Validation Limited (RVL). One 
 
 | Surface | Users | Scope |
 |---|---|---|
-| `src/surfaces/staff` | RVL Admin, RVL Finance | Institutions, crypto keys, QR inspector (Admin). Rate cards, billing periods, adjustments, reports (Finance). |
+| `src/surfaces/staff` | RVL Admin, RVL Finance | Institutions, rate cards, billing periods, adjustments, reports (Admin and Finance). Crypto keys, QR inspector (Admin only). Admin is the highest role and sees everything Finance sees. |
 | `src/surfaces/fi` | Financial-institution users | Own usage, statements, applications and certificate, account. |
 
 Backend: `rvl-secure-bqr-manager` (.NET). This repo holds no backend code.

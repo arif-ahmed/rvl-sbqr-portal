@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog, Textarea, toast } from '../../../shared/ui'
 import type { ActionId } from './actions'
 import { CertificateDrawer } from './certificate-drawer'
+import { currentMonth, priceGaps } from '../rates/rates'
+import { useRateCards } from '../rates/store'
 import { patchInstitution } from './store'
 import type { Institution, InstitutionStatus } from './types'
 
@@ -21,6 +23,7 @@ const confirmCopy: Partial<Record<ActionId, Confirm>> = {
  */
 export function useInstitutionActions(): { run: (inst: Institution, action: ActionId) => void; dialogs: ReactNode } {
   const navigate = useNavigate()
+  const rateCards = useRateCards()
   const [pending, setPending] = useState<{ inst: Institution; action: ActionId } | null>(null)
   const [reason, setReason] = useState('')
   const [certFor, setCertFor] = useState<Institution | null>(null)
@@ -43,6 +46,9 @@ export function useInstitutionActions(): { run: (inst: Institution, action: Acti
           description={
             <>
               {copy.text(pending.inst.name)}
+              {pending.action === 'activate' && priceGaps(pending.inst.access, rateCards, pending.inst.id, currentMonth()).some((g) => g.reason === 'no-card') && (
+                <span className="mt-2 block">There is no rate card yet, so usage will be recorded but not billed until one starts.</span>
+              )}
               {copy.reason && (
                 <Textarea aria-label="Reason (optional)" placeholder="Reason (optional)" className="mt-3 min-h-20" value={reason} onChange={(e) => setReason(e.target.value)} />
               )}

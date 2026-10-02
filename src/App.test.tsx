@@ -49,10 +49,10 @@ describe('App', () => {
     expect(screen.queryByRole('link', { name: 'Crypto keys' })).not.toBeInTheDocument()
   })
 
-  it('shows Admin the platform menu and not billing', async () => {
+  it('shows Admin the platform menu and the billing menu too', async () => {
     await signInAs('Admin')
     expect(await screen.findByRole('link', { name: 'Crypto keys' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Billing periods' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Billing periods' })).toBeInTheDocument()
   })
 
   it('lets Admin, but not Finance, open institution onboarding', async () => {

@@ -11,6 +11,14 @@ export function bdt(amount: number): string {
   return `${amount < 0 ? MINUS : ''}৳ ${body}`
 }
 
+/** Per-call price: ৳ 0.125, ৳ 0.50, ৳ 2. Up to 4 decimals, at least 2 unless whole. */
+export function bdtRate(rate: number): string {
+  const body = Number.isInteger(rate)
+    ? rate.toLocaleString('en-US')
+    : rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+  return `৳ ${body}`
+}
+
 /** Signed money for adjustments: +৳ 250, −৳ 500. */
 export function bdtSigned(amount: number): string {
   return amount > 0 ? `+${bdt(amount)}` : bdt(amount)

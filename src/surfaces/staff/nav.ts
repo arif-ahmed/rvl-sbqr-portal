@@ -3,16 +3,13 @@ import type { Role } from '../../shared/auth/session'
 import type { NavItem } from '../../shared/layout/app-shell'
 
 // One list drives both the sidebar and the routes, so they cannot drift apart.
-const admin: NavItem[] = [
+// Admin is the highest role: it sees everything Finance sees, plus the platform screens.
+const base: NavItem[] = [
   { to: '/staff/overview', label: 'Overview', icon: Home },
   { to: '/staff/institutions', label: 'Institutions', icon: Building2 },
-  { to: '/staff/keys', label: 'Crypto keys', icon: KeyRound },
-  { to: '/staff/inspector', label: 'QR inspector', icon: QrCode },
 ]
 
-const finance: NavItem[] = [
-  { to: '/staff/overview', label: 'Overview', icon: Home },
-  { to: '/staff/institutions', label: 'Institutions', icon: Building2 },
+const billing: NavItem[] = [
   { heading: 'Billing' },
   { to: '/staff/rates', label: 'Rate cards', icon: CreditCard },
   { to: '/staff/periods', label: 'Billing periods', icon: FileText },
@@ -20,4 +17,10 @@ const finance: NavItem[] = [
   { to: '/staff/reports', label: 'Reports', icon: Flag },
 ]
 
-export const staffNav = (role: Role): NavItem[] => (role === 'finance' ? finance : admin)
+const platform: NavItem[] = [
+  { heading: 'Platform' },
+  { to: '/staff/keys', label: 'Crypto keys', icon: KeyRound },
+  { to: '/staff/inspector', label: 'QR inspector', icon: QrCode },
+]
+
+export const staffNav = (role: Role): NavItem[] => (role === 'finance' ? [...base, ...billing] : [...base, ...billing, ...platform])
