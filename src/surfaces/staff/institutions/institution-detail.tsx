@@ -2,8 +2,10 @@ import { ArrowLeft, Check, Circle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import type { Role } from '../../../shared/auth/session'
+import { cn } from '../../../shared/cn'
 import { Banner, Button, Card, CardHeader, StatusChip } from '../../../shared/ui'
 import { typeLabel } from '../onboarding/institution-types'
+import { InstitutionUsageTab } from '../usage/institution-usage'
 import { ActionButtons } from './action-buttons'
 import { daysUntil, setupItems } from './actions'
 import { useInstitutions } from './store'
@@ -32,12 +34,15 @@ function keyText(i: Institution) {
 }
 
 /** One institution: profile, setup progress, credentials, certificate and signing key. UI only. */
-export function InstitutionDetail({ role }: { role: Role }) {
+export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?: 'overview' | 'usage' }) {
   const { id } = useParams()
   const institutions = useInstitutions()
   const { run, dialogs } = useInstitutionActions()
   const inst = institutions.find((i) => i.id === id)
   if (!inst) return <Navigate to="/staff/institutions" replace />
+  // A pending institution cannot have usage yet, so it has no Usage tab.
+  const hasUsage = inst.status !== 'Pending'
+  if (tab === 'usage' && !hasUsage) return <Navigate to={`/staff/institutions/${inst.id}`} replace />
 
   const canManage = role === 'admin'
   const items = setupItems(inst)
@@ -64,6 +69,28 @@ export function InstitutionDetail({ role }: { role: Role }) {
         {canManage && <ActionButtons inst={inst} onAction={run} />}
       </div>
 
+      {hasUsage && (
+        <nav aria-label="Institution sections" className="mb-5 flex gap-1 border-b border-line">
+          {[
+            { label: 'Overview', to: `/staff/institutions/${inst.id}`, on: tab === 'overview' },
+            { label: 'Usage', to: `/staff/institutions/${inst.id}/usage`, on: tab === 'usage' },
+          ].map((t) => (
+            <Link
+              key={t.label}
+              to={t.to}
+              aria-current={t.on ? 'page' : undefined}
+              className={cn('-mb-px border-b-2 px-4 py-2.5 font-medium', t.on ? 'border-accent text-text' : 'border-transparent text-text-2 hover:text-text')}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {tab === 'usage' ? (
+        <InstitutionUsageTab institutionId={inst.id} />
+      ) : (
+        <>
       {inst.status === 'Terminated' && <Banner tone="info" title="Closed permanently">This institution was terminated. Its key and credentials no longer work.</Banner>}
       {inst.status === 'Suspended' && <Banner tone="warn" title="Suspended">This institution cannot generate or validate QR codes until it is reactivated.</Banner>}
       {expiry !== null && expiry <= 30 && (
@@ -149,6 +176,8 @@ export function InstitutionDetail({ role }: { role: Role }) {
           </Card>
         </div>
       </div>
+        </>
+      )}
       {dialogs}
     </>
   )

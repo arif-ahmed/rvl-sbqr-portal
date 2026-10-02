@@ -76,10 +76,12 @@ Available: Button, Chip/StatusChip, Card/CardHeader/Kpi, Table/Th/Td/Tr/EmptyRow
 
 | Meaning | Chip |
 |---|---|
-| Active, Finalized, Applied, Complete, Valid, Generated | `ok` |
-| Pending, Scheduled | `info` |
-| Draft, Queued, Suspended, Indeterminate | `warn` |
-| Terminated, Invalid, Error | `bad` |
+| Active, Finalized, Applied, Complete, VALID, GENERATED | `ok` |
+| Pending, Scheduled, NON_P2P | `info` |
+| Draft, Queued, Suspended, KEY_NOT_FOUND, KEY_SUSPENDED, KEY_REVOKED, KEY_NOT_ACTIVE, REQUEST_STALE | `warn` |
+| Terminated, INVALID_SIGNATURE, STRUCTURAL_INVALID | `bad` |
+
+Usage verdicts are shown with a readable label (`verdictLabel` in `src/shared/usage/usage.ts`) but coloured by their code.
 
 ## Money, dates, numbers
 

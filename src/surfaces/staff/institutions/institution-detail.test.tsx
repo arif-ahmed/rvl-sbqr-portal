@@ -6,13 +6,14 @@ import type { Role } from '../../../shared/auth/session'
 import { InstitutionDetail } from './institution-detail'
 import { getInstitutions, resetInstitutions } from './store'
 
-function open(name: string, role: Role = 'admin') {
+function open(name: string, role: Role = 'admin', tab: 'overview' | 'usage' = 'overview') {
   const id = name ? getInstitutions().find((i) => i.name.startsWith(name))?.id : 'missing'
   render(
-    <MemoryRouter initialEntries={[`/staff/institutions/${id}`]}>
+    <MemoryRouter initialEntries={[`/staff/institutions/${id}${tab === 'usage' ? '/usage' : ''}`]}>
       <Routes>
         <Route path="/staff/institutions" element={<p>list</p>} />
         <Route path="/staff/institutions/:id" element={<InstitutionDetail role={role} />} />
+        <Route path="/staff/institutions/:id/usage" element={<InstitutionDetail role={role} tab="usage" />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -56,6 +57,38 @@ describe('institution detail', () => {
   it('is read-only for Finance', () => {
     open('Surma', 'finance')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('switches between Overview and Usage for an active institution', async () => {
+    const user = open('Shapla')
+    await user.click(screen.getByRole('link', { name: 'Usage' }))
+    expect(screen.getByText('Billable', { selector: 'dt' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Search usage')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Institution' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Overview' }))
+    expect(screen.getByText('API credentials')).toBeInTheDocument()
+  })
+
+  it('shows Finance the Usage tab', () => {
+    open('Karnaphuli', 'finance', 'usage')
+    expect(screen.getByLabelText('Search usage')).toBeInTheDocument()
+  })
+
+  it('explains when an institution has no rate card', () => {
+    open('Teesta', 'admin', 'usage')
+    expect(screen.getByText('No rate card')).toBeInTheDocument()
+    expect(screen.getByText(/no statement is produced/)).toBeInTheDocument()
+  })
+
+  it('has no rate card notice for an institution that has one', () => {
+    open('Shapla', 'admin', 'usage')
+    expect(screen.queryByText('No rate card')).not.toBeInTheDocument()
+  })
+
+  it('has no Usage tab for a pending institution, even by URL', () => {
+    open('Surma', 'admin', 'usage')
+    expect(screen.queryByRole('link', { name: 'Usage' })).not.toBeInTheDocument()
+    expect(screen.getByText('Setup progress')).toBeInTheDocument()
   })
 
   it('returns to the list for an unknown institution', () => {

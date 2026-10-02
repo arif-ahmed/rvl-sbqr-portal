@@ -17,6 +17,8 @@ const refPrefixes = ['INV', 'POS', 'ORD', 'BILL']
 /** The Active institutions in the sample list, and the one the sample FI user belongs to. */
 export const sampleInstitutionIds = ['inst-1', 'inst-2', 'inst-3']
 export const sampleFiInstitutionId = 'inst-1'
+/** Institutions with no rate card: usage is recorded, but no statement is produced. Sample flag until Billing exists. */
+export const sampleNoRateCard = ['inst-3']
 
 function build(): UsageEvent[] {
   const rand = seeded(20261002)
@@ -30,14 +32,23 @@ function build(): UsageEvent[] {
     let verdict: Verdict
     if (x < 0.16) {
       meter = 'GENERATION_STATIC'
-      verdict = 'Generated'
+      verdict = 'GENERATED'
     } else if (x < 0.52) {
       meter = 'GENERATION_DYNAMIC'
-      verdict = 'Generated'
+      verdict = 'GENERATED'
     } else {
       meter = 'VALIDATION'
       const y = rand()
-      verdict = y < 0.86 ? 'Valid' : y < 0.95 ? 'Invalid' : y < 0.98 ? 'Indeterminate' : 'Error'
+      verdict =
+        y < 0.8 ? 'VALID'
+        : y < 0.85 ? 'INVALID_SIGNATURE'
+        : y < 0.88 ? 'STRUCTURAL_INVALID'
+        : y < 0.91 ? 'KEY_NOT_FOUND'
+        : y < 0.93 ? 'KEY_SUSPENDED'
+        : y < 0.94 ? 'KEY_REVOKED'
+        : y < 0.95 ? 'KEY_NOT_ACTIVE'
+        : y < 0.97 ? 'NON_P2P'
+        : 'REQUEST_STALE'
     }
     events.push({
       id: `ue_${(0x15888 - i * 3).toString(16).padStart(6, '0')}`,

@@ -1,7 +1,8 @@
 import { Download } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button, Card, EmptyRow, Input, Pager, Select, StatusChip, Table, Td, Th, Tr, toast } from '../ui'
-import { eventsToCsv, filterEvents, formatEventTime, hasFilters, meterLabel, meters, noFilters, type UsageEvent, type UsageFilters } from './usage'
+import { EventPanel } from './event-panel'
+import { billingReason, eventsToCsv, filterEvents, formatEventTime, hasFilters, meterLabel, meters, noFilters, verdictLabel, type UsageEvent, type UsageFilters } from './usage'
 
 const PER_PAGE = 12
 
@@ -21,6 +22,7 @@ function download(name: string, text: string) {
 export function UsageTable({ events, institutionName }: { events: UsageEvent[]; institutionName?: (id: string) => string }) {
   const [filters, setFilters] = useState<UsageFilters>(noFilters)
   const [page, setPage] = useState(1)
+  const [selected, setSelected] = useState<UsageEvent | null>(null)
   const rows = useMemo(() => filterEvents(events, filters), [events, filters])
   const lastPage = Math.max(1, Math.ceil(rows.length / PER_PAGE))
   const current = Math.min(page, lastPage)
@@ -49,9 +51,9 @@ export function UsageTable({ events, institutionName }: { events: UsageEvent[]; 
           ))}
         </Select>
         <Select aria-label="Billing" className="w-auto" value={filters.billing} onChange={(e) => change({ billing: e.target.value as UsageFilters['billing'] })}>
-          <option value="">Billable and not</option>
-          <option value="billable">Billable only</option>
-          <option value="free">Not billable</option>
+          <option value="">Billed and not billed</option>
+          <option value="billable">Billed only</option>
+          <option value="free">Not billed</option>
         </Select>
         <label className="flex items-center gap-2 text-[13px] text-text-2">
           From
@@ -80,31 +82,49 @@ export function UsageTable({ events, institutionName }: { events: UsageEvent[]; 
             <Th>Meter</Th>
             <Th>Client reference</Th>
             <Th>Result</Th>
-            <Th>Billable</Th>
+            <Th>Billing</Th>
             <Th>Event</Th>
           </tr>
         </thead>
         <tbody>
           {shown.length === 0 && <EmptyRow cols={cols} title="No events match" hint="Adjust the filters or date range." />}
-          {shown.map((e) => (
-            <Tr key={e.id}>
-              <Td className="num whitespace-nowrap">{formatEventTime(e.at)}</Td>
-              {institutionName && <Td>{institutionName(e.institutionId)}</Td>}
-              <Td>{meterLabel(e.meter)}</Td>
-              <Td className="num">{e.ref}</Td>
-              <Td>
-                <StatusChip status={e.verdict} />
-              </Td>
-              <Td>{e.billable ? <b className="text-ok">Yes</b> : <span className="text-text-3">No</span>}</Td>
-              <Td className="num text-text-3">{e.id}</Td>
-            </Tr>
-          ))}
+          {shown.map((e) => {
+            const reason = billingReason(e)
+            return (
+              // The event ID is the real button for keyboard and screen readers; the row click is the mouse shortcut.
+              <Tr key={e.id} onClick={() => setSelected(e)}>
+                <Td className="num whitespace-nowrap">{formatEventTime(e.at)}</Td>
+                {institutionName && <Td>{institutionName(e.institutionId)}</Td>}
+                <Td>{meterLabel(e.meter)}</Td>
+                <Td className="num">{e.ref}</Td>
+                <Td>
+                  <StatusChip status={e.verdict} label={verdictLabel(e.verdict)} />
+                </Td>
+                <Td>
+                  {reason.billed ? (
+                    <b className="text-ok">Billed</b>
+                  ) : (
+                    <>
+                      <b className="text-text-2">Not billed</b>
+                      <small className="block text-text-3">{reason.short}</small>
+                    </>
+                  )}
+                </Td>
+                <Td>
+                  <button type="button" className="num text-accent hover:underline" onClick={(ev) => { ev.stopPropagation(); setSelected(e) }}>
+                    {e.id}
+                  </button>
+                </Td>
+              </Tr>
+            )
+          })}
         </tbody>
       </Table>
       <Pager total={rows.length} page={current} perPage={PER_PAGE} onPage={setPage} />
       <p className="border-t border-line px-5 py-3 text-[12.5px] text-text-3">
-        Latest {events.length} events shown. Indeterminate and error validations are not billed.
+        Latest {events.length} events shown. Every completed check is billed, including rejections. Stale requests are listed but not billed; replayed and failed requests are not recorded. Select an event to see why.
       </p>
+      <EventPanel event={selected} institutionName={institutionName} onClose={() => setSelected(null)} />
     </Card>
   )
 }

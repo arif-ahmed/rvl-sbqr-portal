@@ -9,7 +9,7 @@ export function UsagePage() {
   return (
     <>
       <p className="mb-4 max-w-2xl text-text-2">
-        Every QR generation and validation made with your credentials. Validations are billed only when the verdict is conclusive (valid or invalid).
+        Every QR generation and validation made with your credentials. Every completed check is billed, including rejections. Select an event to see why it is or is not billed.
       </p>
       <UsageTable events={events} />
     </>
