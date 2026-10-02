@@ -38,6 +38,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    env: { VITE_MOCK_AUTH: 'true' },
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
   },

@@ -1,0 +1,150 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff, QrCode } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
+import { homePath, signIn, useSession, type Surface } from '../shared/auth/session'
+import { cn } from '../shared/cn'
+import { Banner, Button, Field, Input } from '../shared/ui'
+
+const schema = z.object({
+  userId: z.string().trim().min(1, 'Enter your user ID.'),
+  password: z.string().min(1, 'Enter your password.'),
+})
+type Values = z.infer<typeof schema>
+
+const copy: Record<Surface, { headline: string; text: string; hint: string }> = {
+  fi: {
+    headline: 'Your QR usage, statements and credentials in one place.',
+    text: 'Review every generation and validation, download monthly statements and keep your certificate current.',
+    hint: 'you@yourbank.example',
+  },
+  staff: {
+    headline: 'Run QR operations and billing with confidence.',
+    text: 'Onboard institutions, manage keys, set rate cards and close each billing month with a full audit trail.',
+    hint: 'you@rvl.example',
+  },
+}
+
+export default function LoginPage() {
+  const session = useSession()
+  const navigate = useNavigate()
+  const [surface, setSurface] = useState<Surface>('fi')
+  const [error, setError] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { userId: '', password: '' } })
+  const { errors, isSubmitting } = form.formState
+
+  // The login screen takes its look from the chosen audience, like the signed-in app does.
+  useEffect(() => {
+    document.documentElement.dataset.surface = surface
+  }, [surface])
+
+  if (session) return <Navigate to={homePath(session)} replace />
+
+  async function onSubmit(v: Values) {
+    setError('')
+    try {
+      const next = await signIn(v.userId, v.password, surface)
+      navigate(homePath(next), { replace: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not sign in.')
+    }
+  }
+
+  return (
+    <div className="grid min-h-svh lg:grid-cols-[1.05fr_1fr]">
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-side to-side-2 p-11 text-white lg:flex">
+        <div className="flex items-center gap-3">
+          <span className="grid size-9 place-items-center rounded-[10px] bg-white text-accent-strong">
+            <QrCode className="size-5" aria-hidden />
+          </span>
+          <b className="font-head text-sm">Secure Bangla QR</b>
+        </div>
+        <div>
+          <h2 className="mb-3.5 max-w-[16ch] font-head text-[32px] leading-[40px] font-bold tracking-tight">{copy[surface].headline}</h2>
+          <p className="max-w-[44ch] text-[15px] leading-[23px] text-side-text">{copy[surface].text}</p>
+        </div>
+        <small className="text-side-head">© 2026 Relief Validation Limited · Bangladesh Bank BQR</small>
+      </section>
+
+      <section className="grid place-items-center p-8">
+        <div className="w-full max-w-[420px]">
+          <h1 className="mb-1.5 font-head text-[26px] leading-8 font-bold tracking-tight">Sign in</h1>
+          <p className="mb-6 text-text-2">{surface === 'fi' ? 'Institution portal for Secure Bangla QR.' : 'RVL staff console for operations and finance.'}</p>
+
+          <div role="tablist" aria-label="Sign in as" className="mb-6 grid grid-cols-2 rounded-[11px] bg-line p-1">
+            {(['fi', 'staff'] as const).map((s) => (
+              <button
+                key={s}
+                role="tab"
+                aria-selected={surface === s}
+                onClick={() => {
+                  setSurface(s)
+                  setError('')
+                }}
+                className={cn('h-9 rounded-lg font-semibold text-text-2', surface === s && 'bg-surface text-text shadow-sm')}
+              >
+                {s === 'fi' ? 'Institution' : 'RVL Staff'}
+              </button>
+            ))}
+          </div>
+
+          {error && <Banner tone="bad" title={error} />}
+
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+            <Field label="User ID" htmlFor="userId" error={errors.userId?.message}>
+              <Input id="userId" autoComplete="username" placeholder={copy[surface].hint} aria-invalid={!!errors.userId} {...form.register('userId')} />
+            </Field>
+            <Field label="Password" htmlFor="password" error={errors.password?.message}>
+              <div className="relative">
+                <Input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" aria-invalid={!!errors.password} {...form.register('password')} />
+                <button
+                  type="button"
+                  className="absolute top-1 right-1.5 grid size-8 place-items-center text-text-3"
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPw((s) => !s)}
+                >
+                  {showPw ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+                </button>
+              </div>
+            </Field>
+            <Button type="submit" variant="primary" className="mt-2 h-11 w-full" disabled={isSubmitting}>
+              Sign in
+            </Button>
+          </form>
+
+          {import.meta.env.VITE_MOCK_AUTH === 'true' && <DemoAccounts surface={surface} onPick={(id, pw) => { form.setValue('userId', id); form.setValue('password', pw) }} />}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function DemoAccounts({ surface, onPick }: { surface: Surface; onPick: (id: string, pw: string) => void }) {
+  // Dynamic import keeps the demo accounts out of builds that don't enable mock auth.
+  const [demo, setDemo] = useState<typeof import('../shared/auth/mock') | null>(null)
+  useEffect(() => {
+    import('../shared/auth/mock').then(setDemo)
+  }, [])
+  if (!demo) return null
+  const shown = demo.demoAccounts.filter((a) => a.surface === surface)
+  return (
+    <div className="mt-6 border-t border-line pt-4">
+      <small className="mb-2.5 block text-text-3">Prototype demo accounts (password {demo.DEMO_PASSWORD})</small>
+      <div className="flex flex-wrap gap-2">
+        {shown.map((a) => (
+          <button
+            key={a.userId}
+            type="button"
+            onClick={() => onPick(a.userId, demo.DEMO_PASSWORD)}
+            className="h-8 rounded-full border border-line-2 bg-surface px-3 text-[12.5px] font-medium hover:border-accent"
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}

@@ -18,6 +18,8 @@ npm ci
 npm run dev            # http://localhost:5175
 ```
 
+Sign-in uses demo accounts while the API has no per-user login: `.env.example` sets `VITE_MOCK_AUTH=true`, and the login page then lists them (password `Demo@1234`). With the flag off, sign-in is refused. Replace `signIn` in `src/shared/auth/session.ts` when the real endpoint exists.
+
 | Command | What it does |
 |---|---|
 | `npm run dev` | Vite dev server; proxies `/v1` and `/openapi` to `SBQR_API_URL` (default `http://localhost:5001`) |
@@ -27,7 +29,7 @@ npm run dev            # http://localhost:5175
 
 ## Status
 
-Scaffolded. The app shell, design tokens, formatters, CI and docs are in place; the screens are not built. `design/portal-prototype.html` is a clickable prototype of every screen (open it in a browser; demo password `Demo@1234`).
+Shell built. Sign-in, the role-aware layout and per-role navigation work; each screen is a "Not built yet" placeholder. `design/portal-prototype.html` is a clickable prototype of every screen (open it in a browser; demo password `Demo@1234`).
 
 ## Layout
 
@@ -37,7 +39,11 @@ src/
   index.css           design tokens (see DESIGN.md)
   surfaces/staff/     RVL Admin and Finance screens
   surfaces/fi/        Institution screens
-  shared/             format helpers; later ui/, api client, auth
+  pages/login.tsx     sign-in for both audiences
+  shared/auth         in-memory session, sign-in (mock until the API has user login)
+  shared/layout       AppShell (sidebar, top bar), ComingSoon placeholder
+  shared/ui           design-system components
+  shared/             format helpers, cn, theme
 design/               prototype (visual and behaviour reference)
 docs/                 decisions and notes
 DESIGN.md             design system guide
