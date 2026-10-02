@@ -81,7 +81,7 @@ export function InstitutionBillingTab({ institutionId, institutionName }: { inst
       </Card>
 
       {selected && (
-        <StatementDrawer statement={selected} institutionName={institutionName} meta={billing.periodMeta[selected.period]} onClose={() => setSelected(null)} />
+        <StatementDrawer statement={selected} institutionName={institutionName} meta={billing.periodMeta[selected.period]} printHref={`/staff/periods/${selected.period}/statements/${selected.institutionId}`} onClose={() => setSelected(null)} />
       )}
     </div>
   )

@@ -51,7 +51,7 @@ export function OverviewPage({ session }: { session: Session }) {
       : undefined
 
   const attention: AttentionItem[] = []
-  if (queued > 0) attention.push({ tone: 'warn', icon: AlertTriangle, title: `${queued} usage events queued`, sub: `${nameOf(queuedEvents(billing)[0].institutionId)} · blocks finalizing`, to: '/staff/reports' })
+  if (queued > 0) attention.push({ tone: 'warn', icon: AlertTriangle, title: `${queued} usage events queued`, sub: `${nameOf(queuedEvents(billing)[0].institutionId)} · blocks finalizing`, to: '/staff/periods' })
   if (pending > 0 && draft) attention.push({ tone: 'info', icon: Info, title: `${pending} pending adjustments`, sub: `Applied when ${periodName(draft)} is finalized`, to: '/staff/adjustments' })
   for (const i of active) {
     const days = i.certificate ? daysUntil(i.certificate.expiresAt) : null

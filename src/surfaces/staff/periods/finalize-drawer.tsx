@@ -1,6 +1,5 @@
 import { Lock } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import type { Session } from '../../../shared/auth/session'
 import { bdt, bdtSigned, periodName } from '../../../shared/format'
 import { Banner, Button, Drawer, Field, Input, toast } from '../../../shared/ui'
@@ -55,7 +54,7 @@ export function FinalizeDrawer({ period, totals, session, onClose }: { period: P
 
       {blocked && (
         <Banner tone="bad" title="409 · USAGE_NOT_COMPLETE">
-          Usage events have not been delivered. Requeue them in <Link to="/staff/reports" onClick={onClose}>Reports</Link>, then try again.
+          Usage events have not been delivered. Close this panel, requeue them from the banner on the page, then try again.
         </Banner>
       )}
 

@@ -7,7 +7,7 @@ Short guide for building screens in this portal. The visual reference is `design
 1. **Billboard, not brochure.** Users scan. One clear title, one primary action per screen, no instructions that need reading.
 2. **Money and counts are the product.** Right-align, tabular digits, always show currency (`৳`), never round silently.
 3. **Say what is final.** Draft vs Finalized is always visible. Locked data looks locked.
-4. **Errors say what to do next.** Name the cause and link to the fix (e.g. 409 `USAGE_NOT_COMPLETE` → "Resolve in Reports").
+4. **Errors say what to do next.** Name the cause and link to the fix (e.g. 409 `USAGE_NOT_COMPLETE` → a "Requeue all" button in the banner on Billing periods).
 5. **Omit, then omit again.** If a field or column is not used by someone every week, leave it out.
 
 ## Surfaces
@@ -99,7 +99,7 @@ Usage verdicts are shown with a readable label (`verdictLabel` in `src/shared/us
 ## Screens (MVP)
 
 Staff, Admin: Overview, Institutions (list, detail with Applications, Certificate and credentials, Billing; onboarding wizard), Crypto keys, QR inspector.
-Staff, Finance: Overview, Rate cards, Billing periods (finalize), Adjustments, Reports (late usage, pending adjustments).
+Staff, Finance: Overview, Rate cards, Billing periods (finalize), Adjustments, Reports (monthly summary, by institution, revenue trend; Download PDF prints the view, Download CSV exports it). A statement opens as a printable A4 bill from Billing periods.
 Institution: Overview, Usage, Statements, Applications and certificate, Account.
 Out of MVP: Payments, Dues.
 

@@ -184,6 +184,36 @@ body {
   border-radius: 6px;
 }
 
+/* Printing (Download PDF): always the light palette, whatever theme is on screen. Placed last so
+   it wins over the dark rules above at equal specificity. */
+@media print {
+  :root,
+  :root:not([data-theme='light']),
+  :root[data-theme='dark'] {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f9faf9;
+    --line: #cdd5d1;
+    --text: #101714;
+    --text-2: #46524c;
+    --text-3: #5d6963;
+    --ok: #0e7547;
+    --ok-bg: #e3f4eb;
+    --warn: #9a5b00;
+    --warn-bg: #fff2d9;
+    --bad: #c4302b;
+    --bad-bg: #fdeceb;
+    --info: #1d5fb8;
+    --info-bg: #e8f0fc;
+    --accent: #14935a;
+    --accent-strong: #0e7547;
+    --accent-soft: #e3f4eb;
+  }
+  section {
+    break-inside: avoid;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

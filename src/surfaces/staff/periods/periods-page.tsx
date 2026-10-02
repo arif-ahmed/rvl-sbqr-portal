@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, CreditCard, Download, PlusCircle, QrCode, RefreshCw, ShieldCheck } from 'lucide-react'
+import { CreditCard, Download, PlusCircle, QrCode, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '../../../shared/auth/session'
@@ -15,19 +15,12 @@ import {
   type Period,
   type Statement,
 } from '../../../shared/billing/billing'
-import { recalculatePeriod, useBilling } from '../../../shared/billing/store'
+import { downloadText as download } from '../../../shared/download'
+import { PeriodPicker } from '../../../shared/billing/period-picker'
+import { recalculatePeriod, requeueAll, useBilling } from '../../../shared/billing/store'
 import { StatementDrawer } from '../../../shared/billing/statement-drawer'
-import { Banner, Button, Card, CardHeader, EmptyRow, Kpi, Select, StatusChip, Table, Td, Th, Tr, toast } from '../../../shared/ui'
+import { Banner, Button, Card, CardHeader, EmptyRow, Kpi, StatusChip, Table, Td, Th, Tr, toast } from '../../../shared/ui'
 import { FinalizeDrawer } from './finalize-drawer'
-
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 /**
  * Preparing the month's bills for every institution: review the draft statements, clear what
@@ -46,16 +39,6 @@ export function PeriodsPage({ session }: { session: Session }) {
   const pending = pendingAdjustments(billing, period).length
   const nameOf = (id: string) => billing.institutions.find((i) => i.id === id)?.name ?? id
 
-  const idx = billing.periods.indexOf(period)
-  // Newest first, one optgroup per year — the list stays scannable as months accumulate.
-  const groups: { year: string; months: Period[] }[] = []
-  for (const p of [...billing.periods].reverse()) {
-    const year = p.slice(0, 4)
-    const last = groups.at(-1)
-    if (last?.year === year) last.months.push(p)
-    else groups.push({ year, months: [p] })
-  }
-
   const recalc = () => {
     recalculatePeriod(period)
     toast.success(`Draft recalculated from the latest usage at ${stampNow().slice(11)}`)
@@ -70,23 +53,7 @@ export function PeriodsPage({ session }: { session: Session }) {
         </div>
         <span className="flex-1" />
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button aria-label="Previous period" className="h-10 px-3" disabled={idx === 0} onClick={() => setPeriod(billing.periods[idx - 1])}>
-            <ChevronLeft className="size-4" aria-hidden />
-          </Button>
-          <Select aria-label="Billing period" className="w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            {groups.map((g) => (
-              <optgroup key={g.year} label={g.year}>
-                {g.months.map((p) => (
-                  <option key={p} value={p}>
-                    {periodName(p).split(' ')[0]} · {billing.periodMeta[p].status}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
-          <Button aria-label="Next period" className="h-10 px-3" disabled={idx === billing.periods.length - 1} onClick={() => setPeriod(billing.periods[idx + 1])}>
-            <ChevronRight className="size-4" aria-hidden />
-          </Button>
+          <PeriodPicker billing={billing} value={period} onChange={setPeriod} />
           {!finalized && (
             <>
               <Button className="h-10" onClick={recalc}>
@@ -122,7 +89,18 @@ export function PeriodsPage({ session }: { session: Session }) {
       {!finalized && queued > 0 && (
         <Banner tone="warn" title="Usage not complete">
           {queued} usage {queued === 1 ? 'event is' : 'events are'} still queued in the outbox. Finalizing is blocked until
-          they are delivered. <Link to="/staff/reports">Resolve in Reports</Link>
+          they are delivered.
+          <div className="mt-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                requeueAll()
+                toast.success('Queued usage delivered')
+              }}
+            >
+              Requeue all
+            </Button>
+          </div>
         </Banner>
       )}
       {!finalized && pending > 0 && (
@@ -220,7 +198,7 @@ export function PeriodsPage({ session }: { session: Session }) {
         </p>
       </Card>
 
-      {selected && <StatementDrawer statement={selected} institutionName={nameOf(selected.institutionId)} meta={billing.periodMeta[selected.period]} onClose={() => setSelected(null)} />}
+      {selected && <StatementDrawer statement={selected} institutionName={nameOf(selected.institutionId)} meta={billing.periodMeta[selected.period]} printHref={`/staff/periods/${selected.period}/statements/${selected.institutionId}`} onClose={() => setSelected(null)} />}
       {finalizing && !finalized && <FinalizeDrawer period={period} totals={totals} session={session} onClose={() => setFinalizing(false)} />}
     </>
   )

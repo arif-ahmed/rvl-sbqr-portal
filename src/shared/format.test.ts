@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bdt, bdtRate, bdtSigned, count, periodName } from './format'
+import { bdt, bdtRate, bdtSigned, count, percent, percentSigned, periodName } from './format'
 
 describe('format', () => {
   it('formats whole and fractional money', () => {
@@ -18,6 +18,14 @@ describe('format', () => {
     expect(bdt(-250)).toBe('−৳ 250')
     expect(bdtSigned(250)).toBe('+৳ 250')
     expect(bdtSigned(-500)).toBe('−৳ 500')
+  })
+
+  it('formats shares and changes with one decimal and a true minus', () => {
+    expect(percent(12.34)).toBe('12.3%')
+    expect(percentSigned(4.25)).toBe('+4.3%')
+    expect(percentSigned(-1)).toBe('−1.0%')
+    expect(percentSigned(0)).toBe('0.0%')
+    expect(percentSigned(-0.01)).toBe('0.0%')
   })
 
   it('formats counts and billing periods', () => {

@@ -24,11 +24,11 @@ export function AppShell(props: { surface: Surface; session: Session; nav: NavIt
   const initials = session.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-[244px_minmax(0,1fr)]">
+    <div className="grid min-h-svh lg:grid-cols-[244px_minmax(0,1fr)] print:block">
       <aside
         aria-label="Primary"
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col gap-0.5 overflow-auto bg-side p-3.5 text-side-text transition-transform lg:sticky lg:top-0 lg:z-auto lg:h-svh lg:w-auto lg:translate-x-0',
+          'print:hidden fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col gap-0.5 overflow-auto bg-side p-3.5 text-side-text transition-transform lg:sticky lg:top-0 lg:z-auto lg:h-svh lg:w-auto lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -76,7 +76,7 @@ export function AppShell(props: { surface: Surface; session: Session; nav: NavIt
       {open && <div className="fixed inset-0 z-40 bg-black/55 lg:hidden" onClick={() => setOpen(false)} aria-hidden />}
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2.5 border-b border-line bg-surface px-4 py-2.5 lg:px-7">
+        <header className="print:hidden sticky top-0 z-30 flex min-h-16 items-center gap-2.5 border-b border-line bg-surface px-4 py-2.5 lg:px-7">
           <button className="grid size-10 place-items-center rounded-full border border-line lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
             <MenuIcon className="size-[18px]" />
           </button>
@@ -119,7 +119,7 @@ export function AppShell(props: { surface: Surface; session: Session; nav: NavIt
             </Menu.Portal>
           </Menu.Root>
         </header>
-        <main className="max-w-[1360px] p-4 lg:p-7">{children}</main>
+        <main className="max-w-[1360px] p-4 lg:p-7 print:p-0">{children}</main>
       </div>
     </div>
   )

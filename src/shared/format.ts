@@ -29,6 +29,17 @@ export function count(n: number): string {
   return Math.round(n).toLocaleString('en-US')
 }
 
+/** 12.3%. One decimal. */
+export function percent(n: number): string {
+  return `${n.toFixed(1)}%`
+}
+
+/** Change against a previous figure: +4.2%, −1.0%. */
+export function percentSigned(n: number): string {
+  const body = percent(Math.abs(n))
+  return n < 0 && body !== '0.0%' ? `${MINUS}${body}` : n > 0 ? `+${body}` : body
+}
+
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',

@@ -1,17 +1,10 @@
-import { Download } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { bdt, bdtRate, bdtSigned, count, periodName } from '../format'
 import { cn } from '../cn'
+import { downloadText as download } from '../download'
 import { Button, Drawer, Table, Td, Th, toast } from '../ui'
 import { statementToCsv, type BillingPeriodMeta, type Statement } from './billing'
-
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 const Amount = ({ value, signed }: { value: number; signed?: boolean }) => (
   <span className={cn(value < 0 && 'text-bad', value > 0 && signed && 'text-ok')}>{signed ? bdtSigned(value) : bdt(value)}</span>
@@ -25,11 +18,14 @@ export function StatementDrawer({
   statement,
   institutionName,
   meta,
+  printHref,
   onClose,
 }: {
   statement: Statement
   institutionName: string
   meta: BillingPeriodMeta
+  /** Where the printable bill lives on this surface; omit when there is none. */
+  printHref?: string
   onClose: () => void
 }) {
   const finalized = meta.status === 'Finalized'
@@ -47,6 +43,11 @@ export function StatementDrawer({
       footer={
         <>
           <Button onClick={onClose}>Close</Button>
+          {printHref && (
+            <Link to={printHref} className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 font-semibold hover:bg-surface-2">
+              <FileText className="size-4" aria-hidden /> Open bill (PDF)
+            </Link>
+          )}
           <Button variant="primary" onClick={exportCsv}>
             <Download className="size-4" aria-hidden /> Download CSV
           </Button>

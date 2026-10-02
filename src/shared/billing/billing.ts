@@ -194,7 +194,28 @@ export function stampNow(now = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
 }
 
-const csvCell = (value: string | number | boolean) => {
+/** Disputes are accepted this many days after approval (PRD R27; contract check pending, Q7). */
+export const DISPUTE_WINDOW_DAYS = 30
+
+/** 'YYYY-MM-DD HH:mm' of approval -> 'YYYY-MM-DD', the last day a dispute is accepted. */
+export function disputeWindowEnd(finalizedAt: string): string {
+  const [y, m, d] = finalizedAt.slice(0, 10).split('-').map(Number)
+  const end = new Date(y, m - 1, d + DISPUTE_WINDOW_DAYS)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`
+}
+
+/** Approved statements of an institution for months before `period`, oldest first. */
+export function earlierStatements(data: BillingData, institutionId: string, period: Period): { period: Period; total: number }[] {
+  return data.periods
+    .filter((p) => p < period && data.periodMeta[p].status === 'Finalized')
+    .flatMap((p) => {
+      const s = buildStatement(data, institutionId, p)
+      return s ? [{ period: p, total: s.total }] : []
+    })
+}
+
+const csvCell =(value: string | number | boolean) => {
   const s = String(value)
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }

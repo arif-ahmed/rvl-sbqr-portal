@@ -23,7 +23,7 @@ describe('billing periods page', () => {
     expect(screen.getByRole('heading', { name: 'September 2026' })).toBeInTheDocument()
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('Usage not complete')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Resolve in Reports' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Requeue all' })).toBeInTheDocument()
     // Every number on the page ties back to a statement row. Shapla has no adjustment this
     // month, so its subtotal and total are the same figure.
     expect(screen.getAllByText('৳ 9,658.13')).toHaveLength(2)
@@ -65,7 +65,15 @@ describe('billing periods page', () => {
     expect(confirm).toBeEnabled()
     await user.click(confirm)
     expect(within(drawer).getByText('409 · USAGE_NOT_COMPLETE')).toBeInTheDocument()
-    expect(within(drawer).getByRole('link', { name: 'Reports' })).toBeInTheDocument()
+    expect(within(drawer).getByText(/requeue them from the banner/)).toBeInTheDocument()
+  })
+
+  it('requeues the late usage from the banner and unblocks the close', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Requeue all' }))
+    expect(screen.queryByText('Usage not complete')).not.toBeInTheDocument()
+    expect(getBilling().outbox.every((e) => e.status === 'Delivered')).toBe(true)
   })
 
   it('finalizes once usage is delivered, and settles the pending adjustments', async () => {

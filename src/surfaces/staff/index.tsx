@@ -9,6 +9,7 @@ import { staffNav } from './nav'
 import OnboardingPage from './onboarding/onboarding-page'
 import { OverviewPage } from './overview-page'
 import { PeriodsPage } from './periods/periods-page'
+import { StatementPage } from './periods/statement-page'
 import { RatesPage } from './rates/rates-page'
 import { ReportsPage } from './reports/reports-page'
 
@@ -42,6 +43,9 @@ export default function StaffSurface({ session }: { session: Session }) {
       ))}
       {/* Admin only; Finance falls through to the redirect below. The API enforces this too. */}
       {session.role === 'admin' && <Route path="institutions/new" element={shell('New institution', <OnboardingPage />)} />}
+      <Route path="periods/:period/statements/:institutionId" element={shell('Statement', <StatementPage />)} />
+      <Route path="reports/institution" element={shell('Reports', <ReportsPage view="institution" />)} />
+      <Route path="reports/trend" element={shell('Reports', <ReportsPage view="trend" />)} />
       <Route path="institutions/:id" element={shell('Institution', <InstitutionDetail role={session.role} />)} />
       <Route path="institutions/:id/usage" element={shell('Institution', <InstitutionDetail role={session.role} tab="usage" />)} />
       <Route path="institutions/:id/billing" element={shell('Institution', <InstitutionDetail role={session.role} tab="billing" />)} />
