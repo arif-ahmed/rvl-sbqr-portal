@@ -2,14 +2,13 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import type { Session } from '../../shared/auth/session'
 import { AppShell } from '../../shared/layout/app-shell'
-import { ComingSoon } from '../../shared/layout/coming-soon'
 import { fiNav } from './nav'
+import { OverviewPage } from './overview-page'
 import { StatementDetailPage } from './statement-detail-page'
 import { StatementsPage } from './statements-page'
 import { UsagePage } from './usage-page'
 
 // Financial-institution screens. Reference: design/portal-prototype.html.
-// To build a screen: create it in this folder and swap it in for <ComingSoon /> below.
 export default function FiSurface({ session }: { session: Session }) {
   const pages = fiNav.flatMap((n) => ('to' in n ? [n] : []))
   const shell = (title: string, page: ReactNode) => (
@@ -25,7 +24,7 @@ export default function FiSurface({ session }: { session: Session }) {
           path={p.to.replace('/fi/', '')}
           element={shell(
             p.label,
-            p.to === '/fi/usage' ? <UsagePage /> : p.to === '/fi/statements' ? <StatementsPage /> : <ComingSoon title={p.label} />,
+            p.to === '/fi/usage' ? <UsagePage /> : p.to === '/fi/statements' ? <StatementsPage /> : <OverviewPage session={session} />,
           )}
         />
       ))}
