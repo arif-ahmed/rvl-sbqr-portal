@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en" data-surface="staff">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure Bangla QR · Portal Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font:'Inter','Noto Sans Bengali',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --head:'Montserrat','Inter','Noto Sans Bengali',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --accent:#14935a; --accent-2:#0e7547; --accent-soft:#e3f4eb; --on-accent:#fff;
+  --side:#052b52; --side-2:#0a3d70; --side-text:#a9c3de; --side-head:#7897bb;
+  --bg:#f4f6f5; --surface:#fff; --surface-2:#f9faf9; --line:#e3e8e5; --line-2:#cdd5d1;
+  --text:#101714; --text-2:#46524c; --text-3:#76827c;
+  --ok:#14935a; --ok-bg:#e3f4eb; --warn:#9a5b00; --warn-bg:#fff2d9; --bad:#c4302b; --bad-bg:#fdeceb; --info:#1d5fb8; --info-bg:#e8f0fc;
+  --c1:var(--accent); --c2:#8fd3b2;
+  --shadow:0 1px 2px rgba(16,23,20,.04),0 4px 16px rgba(16,23,20,.04);
+  --r:10px; --sw:244px;
+}
+html[data-surface="fi"]{
+  --accent:#1c56c9; --accent-2:#1444a3; --accent-soft:#e6eefc; --on-accent:#fff;
+  --side:#0a2f66; --side-2:#12428a; --side-text:#b3c8ec; --side-head:#84a0d2;
+  --c2:#9db9ee;
+}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme="light"]){
+    --bg:#0c0f0e; --surface:#141917; --surface-2:#181e1b; --line:#252d29; --line-2:#37413c;
+    --text:#edf2ef; --text-2:#a8b4ae; --text-3:#78857e; --shadow:none;
+    --accent:#2fc27f; --accent-2:#52d99a; --accent-soft:#12372a; --on-accent:#05130c; --side:#04162b; --side-2:#082440; --c2:#245e45;
+    --ok:#3ccf8a; --ok-bg:#12372a; --warn:#f0b24d; --warn-bg:#3a2b0f; --bad:#ff7d78; --bad-bg:#3d1c1b; --info:#7db2ff; --info-bg:#172a46;
+  }
+  html[data-surface="fi"]:not([data-theme="light"]){--accent:#6a9bff;--accent-2:#8fb4ff;--accent-soft:#16294f;--on-accent:#06122b;--side:#060e22;--side-2:#0d1a3a;--c2:#2a4a8a}
+}
+html[data-theme="dark"]{
+  --bg:#0c0f0e; --surface:#141917; --surface-2:#181e1b; --line:#252d29; --line-2:#37413c;
+  --text:#edf2ef; --text-2:#a8b4ae; --text-3:#78857e; --shadow:none;
+  --accent:#2fc27f; --accent-2:#52d99a; --accent-soft:#12372a; --on-accent:#05130c; --side:#04162b; --side-2:#082440; --c2:#245e45;
+  --ok:#3ccf8a; --ok-bg:#12372a; --warn:#f0b24d; --warn-bg:#3a2b0f; --bad:#ff7d78; --bad-bg:#3d1c1b; --info:#7db2ff; --info-bg:#172a46;
+}
+html[data-theme="dark"][data-surface="fi"]{--accent:#6a9bff;--accent-2:#8fb4ff;--accent-soft:#16294f;--on-accent:#06122b;--side:#060e22;--side-2:#0d1a3a;--c2:#2a4a8a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--font);font-size:14px;line-height:20px;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+input,select,textarea{font:inherit;color:var(--text)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:12.5px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.muted{color:var(--text-3)} .t2{color:var(--text-2)} .r{text-align:right} .nowrap{white-space:nowrap}
+.neg{color:var(--bad)} .pos{color:var(--ok)}
+.grow{flex:1}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:var(--sw) minmax(0,1fr);min-height:100vh}
+.side{background:var(--side);color:var(--side-text);padding:18px 14px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:11px;padding:2px 8px 20px;color:#fff}
+.logo{width:36px;height:36px;border-radius:10px;background:#fff;display:grid;place-items:center;flex:none}
+.logo svg{width:24px;height:24px}
+.brand b{display:block;font-family:var(--head);font-size:14px;line-height:17px;letter-spacing:.01em}
+.brand span{font-size:11.5px;color:var(--side-head)}
+.nav-h{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--side-head);padding:16px 12px 6px}
+.nav a{display:flex;align-items:center;gap:11px;padding:0 12px;min-height:40px;border-radius:999px;font-weight:500;transition:background .12s,color .12s}
+.nav a:hover{background:var(--side-2);color:#fff}
+.nav a.on{background:var(--accent);color:var(--on-accent)}
+.nav .badge{margin-left:auto;background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:600;padding:0 7px;line-height:18px}
+.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.09)}
+.top{display:flex;align-items:center;gap:10px;padding:12px 28px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:8;min-height:64px}
+.crumb{font-size:12px;color:var(--text-3)} .crumb a:hover{color:var(--accent)}
+.top h1{font-size:16px;line-height:22px;margin:0;font-weight:650}
+.search{display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);color:var(--text-3);min-width:260px}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.search input{border:0;background:none;outline:0;width:100%}
+.ib{width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;position:relative;color:var(--text-2)}
+.ib:hover{background:var(--surface-2);color:var(--text)}
+.ib .dot{position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--bad);border:2px solid var(--surface)}
+.menu-btn{display:none}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent-2);display:grid;place-items:center;font-weight:650;font-size:13px;flex:none}
+.userbtn{display:flex;align-items:center;gap:10px;padding:3px 10px 3px 3px;border-radius:999px;border:1px solid transparent}
+.userbtn:hover{background:var(--surface-2);border-color:var(--line)}
+.userbtn strong{display:block;font-size:13px;line-height:16px;text-align:left}
+.userbtn small{display:block;font-size:11.5px;color:var(--text-3);line-height:14px;text-align:left}
+.pop{position:absolute;right:0;top:calc(100% + 8px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.14);min-width:280px;z-index:30;overflow:hidden}
+.pop .it{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.pop .it:last-child{border-bottom:0} .pop .it:hover{background:var(--surface-2)}
+.pop .menu{display:flex;align-items:center;gap:10px;padding:10px 16px;width:100%;text-align:left}
+.pop .menu:hover{background:var(--surface-2)}
+.rel{position:relative}
+.content{padding:28px;max-width:1360px}
+
+/* ---------- primitives ---------- */
+.ph{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:space-between;margin-bottom:22px}
+.ph h2{font-family:var(--head);margin:0;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-.015em;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ph p{margin:6px 0 0;color:var(--text-2);max-width:68ch}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 16px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface);font-weight:550;white-space:nowrap;transition:background .12s,border-color .12s}
+.btn:hover{background:var(--surface-2);border-color:var(--text-3)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.pri:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn.dng{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line-2))}
+.btn.dng:hover{background:var(--bad-bg)}
+.btn.dngf{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.sm{height:30px;padding:0 11px;font-size:13px;border-radius:8px}
+.btn.ghost{border-color:transparent;background:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.ch{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.ch h3{margin:0;font-size:15px;line-height:20px;font-weight:650}
+.ch .sub{font-size:12.5px;color:var(--text-3)}
+.pad{padding:20px}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))} .g3{grid-template-columns:repeat(3,minmax(0,1fr))} .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g-main{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+.mb{margin-bottom:16px}
+.kpi{padding:18px 20px}
+.kpi small{display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:12.5px;font-weight:550}
+.kpi small .ico{width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent-2);display:grid;place-items:center}
+.kpi small .ico svg{width:15px;height:15px}
+.kpi .v{font-size:26px;line-height:34px;font-weight:700;margin-top:10px;letter-spacing:-.02em}
+.kpi .s{font-size:12.5px;color:var(--text-2);margin-top:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.bad{background:var(--bad-bg);color:var(--bad)} .chip.info{background:var(--info-bg);color:var(--info)}
+.chip.plain::before{display:none}
+.tag{display:inline-block;height:20px;line-height:20px;padding:0 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);color:var(--text-2)}
+.banner{display:flex;gap:12px;padding:14px 16px;border-radius:12px;border:1px solid;margin-bottom:16px;align-items:flex-start}
+.banner.warn{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 28%,transparent);color:var(--warn)}
+.banner.info{background:var(--info-bg);border-color:color-mix(in srgb,var(--info) 28%,transparent);color:var(--info)}
+.banner.bad{background:var(--bad-bg);border-color:color-mix(in srgb,var(--bad) 30%,transparent);color:var(--bad)}
+.banner.ok{background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 28%,transparent);color:var(--ok)}
+.banner b{display:block;color:var(--text)} .banner div div{color:var(--text-2);font-size:13px;line-height:19px}
+.banner a,.link{font-weight:600;text-decoration:underline;text-underline-offset:3px;color:inherit;cursor:pointer}
+.link{color:var(--accent-2)}
+.hero{display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:22px 24px;border-radius:14px;background:linear-gradient(120deg,var(--side) 0%,var(--side-2) 100%);color:#fff;margin-bottom:16px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--accent) 55%,transparent),transparent)}
+.hero h2{font-family:var(--head);margin:0;font-size:20px;line-height:26px;font-weight:650} .hero p{margin:4px 0 0;color:var(--side-text);max-width:56ch}
+.hero .btn{position:relative;z-index:1}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs button{padding:10px 14px;font-weight:550;color:var(--text-2);border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px}
+.tabs button:hover{color:var(--text)} .tabs button.on{color:var(--accent-2);border-color:var(--accent)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}
+.fld{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--text-3)}
+.fld input,.fld select{border:0;background:none;outline:0;color:var(--text);min-width:0}
+.fld:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}
+.fld select{padding-right:4px;cursor:pointer}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:600;color:var(--text-3);text-align:left;padding:10px 20px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:13px 20px;border-bottom:1px solid var(--line);vertical-align:middle}
+th.r,td.r{text-align:right}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--surface-2)}
+tfoot td{font-weight:700;background:var(--surface-2);border-top:1px solid var(--line);border-bottom:0}
+.two b{display:block} .two small{display:block;color:var(--text-3);font-size:12px}
+.pager{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--line);color:var(--text-2);font-size:13px}
+.pager .pg{display:flex;gap:4px}
+.pager .pg button{min-width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:550}
+.pager .pg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.pager .pg button:disabled{opacity:.4;cursor:not-allowed}
+.empty{padding:48px 20px;text-align:center;color:var(--text-3)}
+.empty b{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;min-width:80px} .bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.list .row{display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);align-items:flex-start;width:100%;text-align:left}
+.list .row:last-child{border-bottom:0} .list a.row:hover,.list button.row:hover{background:var(--surface-2)}
+.list .ico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
+.ico.warn{background:var(--warn-bg);color:var(--warn)} .ico.info{background:var(--info-bg);color:var(--info)} .ico.ok{background:var(--ok-bg);color:var(--ok)} .ico.bad{background:var(--bad-bg);color:var(--bad)}
+.legend{display:flex;gap:16px;font-size:12.5px;color:var(--text-2)} .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:10px 28px}
+.kv dt{color:var(--text-3)} .kv dd{margin:0;font-weight:500;word-break:break-word}
+.note{font-size:12.5px;color:var(--text-3);padding:12px 20px;border-top:1px solid var(--line)}
+.sw{width:40px;height:22px;border-radius:99px;background:var(--line-2);position:relative;transition:background .15s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw[aria-checked="true"]{background:var(--accent)} .sw[aria-checked="true"]::after{transform:translateX(18px)}
+
+/* ---------- forms / overlays ---------- */
+.f{margin-bottom:16px}
+.f label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:6px}
+.f input,.f select,.f textarea{width:100%;height:40px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface);padding:0 12px;outline:0}
+.f textarea{height:auto;min-height:96px;padding:10px 12px;resize:vertical}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}
+.f.err input,.f.err select,.f.err textarea{border-color:var(--bad)}
+.f .e{display:none;color:var(--bad);font-size:12.5px;margin-top:5px} .f.err .e{display:block}
+.f .h{font-size:12.5px;color:var(--text-3);margin-top:5px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.scrim{position:fixed;inset:0;background:rgba(6,12,10,.55);z-index:40;animation:fade .15s}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(480px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:41;display:flex;flex-direction:column;animation:slide .2s ease}
+.drawer.wide{width:min(620px,100%)}
+.drawer>header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--line)}
+.drawer>header h3{margin:0;font-size:16px}
+.drawer .body{padding:22px;overflow:auto;flex:1}
+.drawer>footer{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:14px;z-index:41;padding:24px;animation:pop .15s ease;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.modal h3{margin:0 0 8px;font-size:17px} .modal p{margin:0 0 20px;color:var(--text-2)}
+.modal .acts{justify-content:flex-end}
+.secret{display:flex;gap:8px;align-items:center;padding:12px;border-radius:9px;background:var(--surface-2);border:1px dashed var(--line-2);word-break:break-all}
+.steps{display:flex;gap:8px;margin-bottom:22px}
+.steps div{flex:1;height:4px;border-radius:9px;background:var(--line)} .steps div.on{background:var(--accent)}
+.toasts{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:var(--ok);color:#fff;padding:10px 18px;border-radius:999px;font-weight:600;display:flex;gap:8px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:drop .25s ease}
+.toast.bad{background:var(--bad)}
+@keyframes fade{from{opacity:0}} @keyframes slide{from{transform:translateX(40px);opacity:0}} @keyframes pop{from{opacity:0;transform:translate(-50%,-48%)}} @keyframes drop{from{opacity:0;transform:translateY(-12px)}}
+
+/* ---------- login ---------- */
+.login{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+.l-art{background:linear-gradient(150deg,var(--side) 0%,var(--side-2) 100%);color:#fff;padding:44px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.l-art::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(120% 90% at 20% 90%,#000,transparent 70%)}
+.l-art>*{position:relative}
+.l-art h2{font-family:var(--head);font-size:32px;line-height:42px;margin:0 0 14px;letter-spacing:-.02em;max-width:15ch}
+.l-art p{color:var(--side-text);max-width:44ch;font-size:15px;line-height:23px;margin:0}
+.l-art .pts{display:grid;gap:12px;margin-top:28px} .l-art .pts div{display:flex;gap:10px;align-items:center;color:#dbe8e1}
+.l-art .pts svg{color:var(--accent)}
+html[data-surface="fi"] .l-art .pts svg{color:#8fb4ff}
+.l-form{display:grid;place-items:center;padding:32px;background:var(--bg)}
+.l-card{width:min(420px,100%)}
+.l-card h1{font-family:var(--head);font-size:26px;line-height:32px;margin:0 0 6px;letter-spacing:-.02em} .l-card>p{margin:0 0 22px;color:var(--text-2)}
+.seg{display:grid;grid-template-columns:1fr 1fr;padding:4px;border-radius:11px;background:var(--line);margin-bottom:22px}
+.seg button{height:36px;border-radius:8px;font-weight:600;color:var(--text-2)} .seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.pw{position:relative} .pw button{position:absolute;right:6px;top:4px;width:32px;height:32px;display:grid;place-items:center;color:var(--text-3)}
+.demo{margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+.demo small{display:block;color:var(--text-3);margin-bottom:10px}
+.demo .acts button{height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--line-2);background:var(--surface);font-size:12.5px;font-weight:550}
+.demo .acts button:hover{border-color:var(--accent);color:var(--accent-2)}
+.chk{display:flex;align-items:center;gap:8px;color:var(--text-2)}
+
+@media (max-width:1180px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g-main{grid-template-columns:1fr}.g3{grid-template-columns:1fr 1fr}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)} .login{grid-template-columns:1fr} .l-art{display:none}
+  .side{position:fixed;left:0;top:0;bottom:0;width:272px;z-index:50;transform:translateX(-100%);transition:transform .2s} .side.open{transform:none}
+  .menu-btn{display:grid} .search{display:none} .content{padding:18px 16px} .top{padding:10px 16px}
+  .userbtn div{display:none} .userbtn{padding:3px} .nav a{min-height:44px} .g2,.g3{grid-template-columns:1fr}
+}
+@media (max-width:560px){.g4{grid-template-columns:1fr}.ph h2{font-size:21px}.row2{grid-template-columns:1fr}.hero{padding:18px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script>var x0=["BN","BN","BN","BN","BN","BN","BN","BN","BN","S","B","S","WS","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","B","B","B","S","WS","ON","ON","ET","ET","ET","ON","ON","ON","ON","ON","ON","CS","ON","CS","ON","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","ON","ON","ON","ON","ON","ON","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","ON","ON","ON","ON","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","ON","ON","ON","BN","BN","BN","BN","BN","BN","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","CS","ON","ET","ET","ET","ET","ON","ON","ON","ON","L","ON","ON","ON","ON","ON","ET","ET","EN","EN","ON","L","ON","ON","ON","EN","L","ON","ON","ON","ON","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","L","L","L","L","L","L","L","L"],g0=["AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","CS","AL","ON","ON","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","AL","AL","AL","AL","AL","AN","AN","AN","AN","AN","AN","AN","AN","AN","AN","ET","AN","AN","AL","AL","AL","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","ON","NSM","NSM","NSM","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL"];function m0(O){if(O<=255)return x0[O];if(1424<=O&&O<=1524)return"R";if(1536<=O&&O<=1791)return g0[O&255];if(1792<=O&&O<=2220)return"AL";return"L"}function r0(O){let _=O.length;if(_===0)return null;let J=Array(_),Y=0;for(let V=0;V<_;V++){let $=m0(O.charCodeAt(V));if($==="R"||$==="AL"||$==="AN")Y++;J[V]=$}if(Y===0)return null;let X=_/Y<0.3?0:1,R=new Int8Array(_);for(let V=0;V<_;V++)R[V]=X;let Z=X&1?"R":"L",Q=Z,f=Q;for(let V=0;V<_;V++)if(J[V]==="NSM")J[V]=f;else f=J[V];f=Q;for(let V=0;V<_;V++){let $=J[V];if($==="EN")J[V]=f==="AL"?"AN":"EN";else if($==="R"||$==="L"||$==="AL")f=$}for(let V=0;V<_;V++)if(J[V]==="AL")J[V]="R";for(let V=1;V<_-1;V++){if(J[V]==="ES"&&J[V-1]==="EN"&&J[V+1]==="EN")J[V]="EN";if(J[V]==="CS"&&(J[V-1]==="EN"||J[V-1]==="AN")&&J[V+1]===J[V-1])J[V]=J[V-1]}for(let V=0;V<_;V++){if(J[V]!=="EN")continue;let $;for($=V-1;$>=0&&J[$]==="ET";$--)J[$]="EN";for($=V+1;$<_&&J[$]==="ET";$++)J[$]="EN"}for(let V=0;V<_;V++){let $=J[V];if($==="WS"||$==="ES"||$==="ET"||$==="CS")J[V]="ON"}f=Q;for(let V=0;V<_;V++){let $=J[V];if($==="EN")J[V]=f==="L"?"L":"EN";else if($==="R"||$==="L")f=$}for(let V=0;V<_;V++){if(J[V]!=="ON")continue;let $=V+1;while($<_&&J[$]==="ON")$++;let u=V>0?J[V-1]:Q,q=$<_?J[$]:Q,D=u!=="L"?"R":"L";if(D===(q!=="L"?"R":"L"))for(let K=V;K<$;K++)J[K]=D;V=$-1}for(let V=0;V<_;V++)if(J[V]==="ON")J[V]=Z;for(let V=0;V<_;V++){let $=J[V];if((R[V]&1)===0){if($==="R")R[V]++;else if($==="AN"||$==="EN")R[V]+=2}else if($==="L"||$==="AN"||$==="EN")R[V]++}return R}function u0(O,_){let J=r0(O);if(J===null)return null;let Y=new Int8Array(_.length);for(let X=0;X<_.length;X++)Y[X]=J[_[X]];return Y}var a0=/[ \t\n\r\f]+/g,s0=/[\t\n\r\f]| {2,}|^ | $/;function d0(O){let _=O??"normal";return _==="pre-wrap"?{mode:_,preserveOrdinarySpaces:!0,preserveHardBreaks:!0}:{mode:_,preserveOrdinarySpaces:!1,preserveHardBreaks:!1}}function i0(O){if(!s0.test(O))return O;let _=O.replace(a0," ");if(_.charCodeAt(0)===32)_=_.slice(1);if(_.length>0&&_.charCodeAt(_.length-1)===32)_=_.slice(0,-1);return _}function t0(O){if(!/[\r\f]/.test(O))return O.replace(/\r\n/g,`
+`);return O.replace(/\r\n/g,`
+`).replace(/[\r\f]/g,`
+`)}var d=null,V0;function n0(){if(d===null)d=new Intl.Segmenter(V0,{granularity:"word"});return d}function z0(){d=null}function j0(O){let _=O&&O.length>0?O:void 0;if(V0===_)return;V0=_,d=null}var e0=/\p{Script=Arabic}/u,O0=/\p{M}/u,b0=/\p{Nd}/u;function X0(O){return e0.test(O)}function p(O){for(let _ of O){let J=_.codePointAt(0);if(J>=19968&&J<=40959||J>=13312&&J<=19903||J>=131072&&J<=173791||J>=173824&&J<=177983||J>=177984&&J<=178207||J>=178208&&J<=183983||J>=183984&&J<=191471||J>=196608&&J<=201551||J>=63744&&J<=64255||J>=194560&&J<=195103||J>=12288&&J<=12351||J>=12352&&J<=12447||J>=12448&&J<=12543||J>=44032&&J<=55215||J>=65280&&J<=65519)return!0}return!1}var $0=new Set(["，","．","！","：","；","？","、","。","・","）","〕","〉","》","」","』","】","〗","〙","〛","ー","々","〻","ゝ","ゞ","ヽ","ヾ"]),i=new Set(['"',"(","[","{","“","‘","«","‹","（","〔","〈","《","「","『","【","〖","〘","〚"]),Q0=new Set(["'","’"]),r=new Set([".",",","!","?",":",";","،","؛","؟","।","॥","၊","။","၌","၍","၏",")","]","}","%",'"',"”","’","»","›","…"]),OO=new Set([":",".","،","؛"]),_O=new Set(["၏"]),JO=new Set(["”","’","»","›","」","』","】","》","〉","〕","）"]);function RO(O){if(q0(O))return!0;let _=!1;for(let J of O){if(r.has(J)){_=!0;continue}if(_&&O0.test(J))continue;return!1}return _}function VO(O){for(let _ of O)if(!$0.has(_)&&!r.has(_))return!1;return O.length>0}function XO(O){if(q0(O))return!0;for(let _ of O)if(!i.has(_)&&!Q0.has(_)&&!O0.test(_))return!1;return O.length>0}function q0(O){let _=!1;for(let J of O){if(J==="\\"||O0.test(J))continue;if(i.has(J)||r.has(J)||Q0.has(J)){_=!0;continue}return!1}return _}function YO(O){let _=Array.from(O),J=_.length;while(J>0){let Y=_[J-1];if(O0.test(Y)){J--;continue}if(i.has(Y)||Q0.has(Y)){J--;continue}break}if(J<=0||J===_.length)return null;return{head:_.slice(0,J).join(""),tail:_.slice(J).join("")}}function ZO(O,_){if(O.length===0)return!1;for(let J of O)if(J!==_)return!1;return!0}function $O(O){if(!X0(O)||O.length===0)return!1;return OO.has(O[O.length-1])}function QO(O){if(O.length===0)return!1;return _O.has(O[O.length-1])}function qO(O){if(O.length<2||O[0]!==" ")return null;let _=O.slice(1);if(/^\p{M}+$/u.test(_))return{space:" ",marks:_};return null}function D0(O){for(let _=O.length-1;_>=0;_--){let J=O[_];if(JO.has(J))return!0;if(!r.has(J))return!1}return!1}function DO(O,_){if(_.preserveOrdinarySpaces||_.preserveHardBreaks){if(O===" ")return"preserved-space";if(O==="\t")return"tab";if(_.preserveHardBreaks&&O===`
+`)return"hard-break"}if(O===" ")return"space";if(O===" "||O===" "||O==="⁠"||O==="\uFEFF")return"glue";if(O==="​")return"zero-width-break";if(O==="­")return"soft-hyphen";return"text"}function NO(O,_,J,Y){let X=[],R=null,Z="",Q=J,f=!1,V=0;for(let $ of O){let u=DO($,Y),q=u==="text"&&_;if(R!==null&&u===R&&q===f){Z+=$,V+=$.length;continue}if(R!==null)X.push({text:Z,isWordLike:f,kind:R,start:Q});R=u,Z=$,Q=J+V,f=q,V+=$.length}if(R!==null)X.push({text:Z,isWordLike:f,kind:R,start:Q});return X}function Y0(O){return O==="space"||O==="preserved-space"||O==="zero-width-break"||O==="hard-break"}var fO=/^[A-Za-z][A-Za-z0-9+.-]*:$/;function HO(O,_){let J=O.texts[_];if(J.startsWith("www."))return!0;return fO.test(J)&&_+1<O.len&&O.kinds[_+1]==="text"&&O.texts[_+1]==="//"}function UO(O){return O.includes("?")&&(O.includes("://")||O.startsWith("www."))}function MO(O){let _=O.texts.slice(),J=O.isWordLike.slice(),Y=O.kinds.slice(),X=O.starts.slice();for(let Z=0;Z<O.len;Z++){if(Y[Z]!=="text"||!HO(O,Z))continue;let Q=Z+1;while(Q<O.len&&!Y0(Y[Q])){_[Z]+=_[Q],J[Z]=!0;let f=_[Q].includes("?");if(Y[Q]="text",_[Q]="",Q++,f)break}}let R=0;for(let Z=0;Z<_.length;Z++){let Q=_[Z];if(Q.length===0)continue;if(R!==Z)_[R]=Q,J[R]=J[Z],Y[R]=Y[Z],X[R]=X[Z];R++}return _.length=R,J.length=R,Y.length=R,X.length=R,{len:R,texts:_,isWordLike:J,kinds:Y,starts:X}}function CO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R];if(_.push(Z),J.push(O.isWordLike[R]),Y.push(O.kinds[R]),X.push(O.starts[R]),!UO(Z))continue;let Q=R+1;if(Q>=O.len||Y0(O.kinds[Q]))continue;let f="",V=O.starts[Q],$=Q;while($<O.len&&!Y0(O.kinds[$]))f+=O.texts[$],$++;if(f.length>0)_.push(f),J.push(!0),Y.push("text"),X.push(V),R=$-1}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}var FO=new Set([":","-","/","×",",",".","+","–","—"]),K0=/^[A-Za-z0-9_]+[,:;]*$/,vO=/[,:;]+$/;function E0(O){for(let _ of O)if(b0.test(_))return!0;return!1}function Z0(O){if(O.length===0)return!1;for(let _ of O){if(b0.test(_)||FO.has(_))continue;return!1}return!0}function uO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R],Q=O.kinds[R];if(Q==="text"&&Z0(Z)&&E0(Z)){let f=Z,V=R+1;while(V<O.len&&O.kinds[V]==="text"&&Z0(O.texts[V]))f+=O.texts[V],V++;_.push(f),J.push(!0),Y.push("text"),X.push(O.starts[R]),R=V-1;continue}_.push(Z),J.push(O.isWordLike[R]),Y.push(Q),X.push(O.starts[R])}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function KO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R],Q=O.kinds[R],f=O.isWordLike[R];if(Q==="text"&&f&&K0.test(Z)){let V=Z,$=R+1;while(vO.test(V)&&$<O.len&&O.kinds[$]==="text"&&O.isWordLike[$]&&K0.test(O.texts[$]))V+=O.texts[$],$++;_.push(V),J.push(!0),Y.push("text"),X.push(O.starts[R]),R=$-1;continue}_.push(Z),J.push(f),Y.push(Q),X.push(O.starts[R])}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function zO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R];if(O.kinds[R]==="text"&&Z.includes("-")){let Q=Z.split("-"),f=Q.length>1;for(let V=0;V<Q.length;V++){let $=Q[V];if(!f)break;if($.length===0||!E0($)||!Z0($))f=!1}if(f){let V=0;for(let $=0;$<Q.length;$++){let u=Q[$],q=$<Q.length-1?`${u}-`:u;_.push(q),J.push(!0),Y.push("text"),X.push(O.starts[R]+V),V+=q.length}continue}}_.push(Z),J.push(O.isWordLike[R]),Y.push(O.kinds[R]),X.push(O.starts[R])}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function jO(O){let _=[],J=[],Y=[],X=[],R=0;while(R<O.len){let Z=O.texts[R],Q=O.isWordLike[R],f=O.kinds[R],V=O.starts[R];if(f==="glue"){let $=Z,u=V;R++;while(R<O.len&&O.kinds[R]==="glue")$+=O.texts[R],R++;if(R<O.len&&O.kinds[R]==="text")Z=$+O.texts[R],Q=O.isWordLike[R],f="text",V=u,R++;else{_.push($),J.push(!1),Y.push("glue"),X.push(u);continue}}else R++;if(f==="text")while(R<O.len&&O.kinds[R]==="glue"){let $="";while(R<O.len&&O.kinds[R]==="glue")$+=O.texts[R],R++;if(R<O.len&&O.kinds[R]==="text"){Z+=$+O.texts[R],Q=Q||O.isWordLike[R],R++;continue}Z+=$}_.push(Z),J.push(Q),Y.push(f),X.push(V)}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function bO(O){let _=O.texts.slice(),J=O.isWordLike.slice(),Y=O.kinds.slice(),X=O.starts.slice();for(let R=0;R<_.length-1;R++){if(Y[R]!=="text"||Y[R+1]!=="text")continue;if(!p(_[R])||!p(_[R+1]))continue;let Z=YO(_[R]);if(Z===null)continue;_[R]=Z.head,_[R+1]=Z.tail+_[R+1],X[R+1]=X[R]+Z.head.length}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function EO(O,_,J){let Y=n0(),X=0,R=[],Z=[],Q=[],f=[];for(let q of Y.segment(O))for(let D of NO(q.segment,q.isWordLike??!1,q.index,J)){let b=D.kind==="text";if(_.carryCJKAfterClosingQuote&&b&&X>0&&Q[X-1]==="text"&&p(D.text)&&p(R[X-1])&&D0(R[X-1]))R[X-1]+=D.text,Z[X-1]=Z[X-1]||D.isWordLike;else if(b&&X>0&&Q[X-1]==="text"&&VO(D.text)&&p(R[X-1]))R[X-1]+=D.text,Z[X-1]=Z[X-1]||D.isWordLike;else if(b&&X>0&&Q[X-1]==="text"&&QO(R[X-1]))R[X-1]+=D.text,Z[X-1]=Z[X-1]||D.isWordLike;else if(b&&X>0&&Q[X-1]==="text"&&D.isWordLike&&X0(D.text)&&$O(R[X-1]))R[X-1]+=D.text,Z[X-1]=!0;else if(b&&!D.isWordLike&&X>0&&Q[X-1]==="text"&&D.text.length===1&&D.text!=="-"&&D.text!=="—"&&ZO(R[X-1],D.text))R[X-1]+=D.text;else if(b&&!D.isWordLike&&X>0&&Q[X-1]==="text"&&(RO(D.text)||D.text==="-"&&Z[X-1]))R[X-1]+=D.text;else R[X]=D.text,Z[X]=D.isWordLike,Q[X]=D.kind,f[X]=D.start,X++}for(let q=1;q<X;q++)if(Q[q]==="text"&&!Z[q]&&q0(R[q])&&Q[q-1]==="text")R[q-1]+=R[q],Z[q-1]=Z[q-1]||Z[q],R[q]="";for(let q=X-2;q>=0;q--)if(Q[q]==="text"&&!Z[q]&&XO(R[q])){let D=q+1;while(D<X&&R[D]==="")D++;if(D<X&&Q[D]==="text")R[D]=R[q]+R[D],f[D]=f[q],R[q]=""}let V=0;for(let q=0;q<X;q++){let D=R[q];if(D.length===0)continue;if(V!==q)R[V]=D,Z[V]=Z[q],Q[V]=Q[q],f[V]=f[q];V++}R.length=V,Z.length=V,Q.length=V,f.length=V;let $=jO({len:V,texts:R,isWordLike:Z,kinds:Q,starts:f}),u=bO(KO(zO(uO(CO(MO($))))));for(let q=0;q<u.len-1;q++){let D=qO(u.texts[q]);if(D===null)continue;if(u.kinds[q]!=="space"&&u.kinds[q]!=="preserved-space"||u.kinds[q+1]!=="text"||!X0(u.texts[q+1]))continue;u.texts[q]=D.space,u.isWordLike[q]=!1,u.kinds[q]=u.kinds[q]==="preserved-space"?"preserved-space":"space",u.texts[q+1]=D.marks+u.texts[q+1],u.starts[q+1]=u.starts[q]+D.space.length}return u}function GO(O,_){if(O.len===0)return[];if(!_.preserveHardBreaks)return[{startSegmentIndex:0,endSegmentIndex:O.len,consumedEndSegmentIndex:O.len}];let J=[],Y=0;for(let X=0;X<O.len;X++){if(O.kinds[X]!=="hard-break")continue;J.push({startSegmentIndex:Y,endSegmentIndex:X,consumedEndSegmentIndex:X+1}),Y=X+1}if(Y<O.len)J.push({startSegmentIndex:Y,endSegmentIndex:O.len,consumedEndSegmentIndex:O.len});return J}function N0(O,_,J="normal"){let Y=d0(J),X=Y.mode==="pre-wrap"?t0(O):i0(O);if(X.length===0)return{normalized:X,chunks:[],len:0,texts:[],isWordLike:[],kinds:[],starts:[]};let R=EO(X,_,Y);return{normalized:X,chunks:GO(R,Y),...R}}var a=null,f0=new Map,s=null,PO=/\p{Emoji_Presentation}/u,AO=/[\p{Emoji_Presentation}\p{Extended_Pictographic}\p{Regional_Indicator}\uFE0F\u20E3]/u,_0=null,H0=new Map;function U0(){if(a!==null)return a;if(typeof OffscreenCanvas<"u")return a=new OffscreenCanvas(1,1).getContext("2d"),a;if(typeof document<"u")return a=document.createElement("canvas").getContext("2d"),a;throw Error("Text measurement requires OffscreenCanvas or a DOM canvas context.")}function BO(O){let _=f0.get(O);if(!_)_=new Map,f0.set(O,_);return _}function x(O,_){let J=_.get(O);if(J===void 0)J={width:U0().measureText(O).width,containsCJK:p(O)},_.set(O,J);return J}function h(){if(s!==null)return s;if(typeof navigator>"u")return s={lineFitEpsilon:0.005,carryCJKAfterClosingQuote:!1,preferPrefixWidthsForBreakableRuns:!1,preferEarlySoftHyphenBreak:!1},s;let O=navigator.userAgent,J=navigator.vendor==="Apple Computer, Inc."&&O.includes("Safari/")&&!O.includes("Chrome/")&&!O.includes("Chromium/")&&!O.includes("CriOS/")&&!O.includes("FxiOS/")&&!O.includes("EdgiOS/"),Y=O.includes("Chrome/")||O.includes("Chromium/")||O.includes("CriOS/")||O.includes("Edg/");return s={lineFitEpsilon:J?0.015625:0.005,carryCJKAfterClosingQuote:Y,preferPrefixWidthsForBreakableRuns:J,preferEarlySoftHyphenBreak:J},s}function TO(O){let _=O.match(/(\d+(?:\.\d+)?)\s*px/);return _?parseFloat(_[1]):16}function M0(){if(_0===null)_0=new Intl.Segmenter(void 0,{granularity:"grapheme"});return _0}function wO(O){return PO.test(O)||O.includes("️")}function G0(O){return AO.test(O)}function yO(O,_){let J=H0.get(O);if(J!==void 0)return J;let Y=U0();Y.font=O;let X=Y.measureText("\uD83D\uDE00").width;if(J=0,X>_+0.5&&typeof document<"u"&&document.body!==null){let R=document.createElement("span");R.style.font=O,R.style.display="inline-block",R.style.visibility="hidden",R.style.position="absolute",R.textContent="\uD83D\uDE00",document.body.appendChild(R);let Z=R.getBoundingClientRect().width;if(document.body.removeChild(R),X-Z>0.5)J=X-Z}return H0.set(O,J),J}function LO(O){let _=0,J=M0();for(let Y of J.segment(O))if(wO(Y.segment))_++;return _}function WO(O,_){if(_.emojiCount===void 0)_.emojiCount=LO(O);return _.emojiCount}function g(O,_,J){if(J===0)return _.width;return _.width-WO(O,_)*J}function P0(O,_,J,Y){if(_.graphemeWidths!==void 0)return _.graphemeWidths;let X=[],R=M0();for(let Z of R.segment(O)){let Q=x(Z.segment,J);X.push(g(Z.segment,Q,Y))}return _.graphemeWidths=X.length>1?X:null,_.graphemeWidths}function A0(O,_,J,Y){if(_.graphemePrefixWidths!==void 0)return _.graphemePrefixWidths;let X=[],R=M0(),Z="";for(let Q of R.segment(O)){Z+=Q.segment;let f=x(Z,J);X.push(g(Z,f,Y))}return _.graphemePrefixWidths=X.length>1?X:null,_.graphemePrefixWidths}function B0(O,_){let J=U0();J.font=O;let Y=BO(O),X=TO(O),R=_?yO(O,X):0;return{cache:Y,fontSize:X,emojiCorrection:R}}function T0(){f0.clear(),H0.clear(),_0=null}function m(O){return O==="space"||O==="preserved-space"||O==="tab"||O==="zero-width-break"||O==="soft-hyphen"}function SO(O){return O==="space"}function w0(O,_){if(_<=0)return 0;let J=O%_;if(Math.abs(J)<=0.000001)return _;return _-J}function t(O,_,J,Y){if(!Y||_===null)return O[J];return _[J]-(J>0?_[J-1]:0)}function y0(O,_,J,Y,X,R){let Z=0,Q=_;while(Z<O.length){let f=R?_+O[Z]:Q+O[Z];if((Z+1<O.length?f+X:f)>J+Y)break;Q=f,Z++}return{fitCount:Z,fittedWidth:Q}}function L0(O,_){for(let J=0;J<O.chunks.length;J++){let Y=O.chunks[J];if(_<Y.consumedEndSegmentIndex)return J}return-1}function kO(O,_){let{segmentIndex:J,graphemeIndex:Y}=_;if(J>=O.widths.length)return null;if(Y>0)return _;let X=L0(O,J);if(X<0)return null;let R=O.chunks[X];if(R.startSegmentIndex===R.endSegmentIndex&&J===R.startSegmentIndex)return{segmentIndex:J,graphemeIndex:0};if(J<R.startSegmentIndex)J=R.startSegmentIndex;while(J<R.endSegmentIndex){let Z=O.kinds[J];if(Z!=="space"&&Z!=="zero-width-break"&&Z!=="soft-hyphen")return{segmentIndex:J,graphemeIndex:0};J++}if(R.consumedEndSegmentIndex>=O.widths.length)return null;return{segmentIndex:R.consumedEndSegmentIndex,graphemeIndex:0}}function W0(O,_){if(O.simpleLineWalkFastPath)return IO(O,_);return J0(O,_)}function IO(O,_){let{widths:J,kinds:Y,breakableWidths:X,breakablePrefixWidths:R}=O;if(J.length===0)return 0;let Z=h(),Q=Z.lineFitEpsilon,f=0,V=0,$=!1;function u(q){let D=J[q];if(D>_&&X[q]!==null){let b=X[q],K=R[q]??null;V=0;for(let j=0;j<b.length;j++){let B=t(b,K,j,Z.preferPrefixWidthsForBreakableRuns);if(V>0&&V+B>_+Q)f++,V=B;else{if(V===0)f++;V+=B}}}else V=D,f++;$=!0}for(let q=0;q<J.length;q++){let D=J[q],b=Y[q];if(!$){u(q);continue}let K=V+D;if(K>_+Q){if(SO(b))continue;V=0,$=!1,u(q);continue}V=K}if(!$)return f+1;return f}function cO(O,_,J){let{widths:Y,kinds:X,breakableWidths:R,breakablePrefixWidths:Z}=O;if(Y.length===0)return 0;let Q=h(),f=Q.lineFitEpsilon,V=0,$=0,u=!1,q=0,D=0,b=0,K=0,j=-1,B=0;function k(){j=-1,B=0}function y(H=b,z=K,W=$){V++,J?.({startSegmentIndex:q,startGraphemeIndex:D,endSegmentIndex:H,endGraphemeIndex:z,width:W}),$=0,u=!1,k()}function A(H,z){u=!0,q=H,D=0,b=H+1,K=0,$=z}function T(H,z,W){u=!0,q=H,D=z,b=H,K=z+1,$=W}function L(H,z){if(!u){A(H,z);return}$+=z,b=H+1,K=0}function C(H,z){if(!m(X[H]))return;j=H+1,B=$-z}function F(H){P(H,0)}function P(H,z){let W=R[H],c=Z[H]??null;for(let I=z;I<W.length;I++){let o=t(W,c,I,Q.preferPrefixWidthsForBreakableRuns);if(!u){T(H,I,o);continue}if($+o>_+f)y(),T(H,I,o);else $+=o,b=H,K=I+1}if(u&&b===H&&K===W.length)b=H+1,K=0}let E=0;while(E<Y.length){let H=Y[E],z=X[E];if(!u){if(H>_&&R[E]!==null)F(E);else A(E,H);C(E,H),E++;continue}if($+H>_+f){if(m(z)){L(E,H),y(E+1,0,$-H),E++;continue}if(j>=0){y(j,0,B);continue}if(H>_&&R[E]!==null){y(),F(E),E++;continue}y();continue}L(E,H),C(E,H),E++}if(u)y();return V}function J0(O,_,J){if(O.simpleLineWalkFastPath)return cO(O,_,J);let{widths:Y,lineEndFitAdvances:X,lineEndPaintAdvances:R,kinds:Z,breakableWidths:Q,breakablePrefixWidths:f,discretionaryHyphenWidth:V,tabStopAdvance:$,chunks:u}=O;if(Y.length===0||u.length===0)return 0;let q=h(),D=q.lineFitEpsilon,b=0,K=0,j=!1,B=0,k=0,y=0,A=0,T=-1,L=0,C=0,F=null;function P(){T=-1,L=0,C=0,F=null}function E(N=y,M=A,v=K){b++,J?.({startSegmentIndex:B,startGraphemeIndex:k,endSegmentIndex:N,endGraphemeIndex:M,width:v}),K=0,j=!1,P()}function H(N,M){j=!0,B=N,k=0,y=N+1,A=0,K=M}function z(N,M,v){j=!0,B=N,k=M,y=N,A=M+1,K=v}function W(N,M){if(!j){H(N,M);return}K+=M,y=N+1,A=0}function c(N,M){if(!m(Z[N]))return;let v=Z[N]==="tab"?0:X[N],w=Z[N]==="tab"?M:R[N];T=N+1,L=K-M+v,C=K-M+w,F=Z[N]}function I(N){o(N,0)}function o(N,M){let v=Q[N],w=f[N]??null;for(let G=M;G<v.length;G++){let l=t(v,w,G,q.preferPrefixWidthsForBreakableRuns);if(!j){z(N,G,l);continue}if(K+l>_+D)E(),z(N,G,l);else K+=l,y=N,A=G+1}if(j&&y===N&&A===v.length)y=N+1,A=0}function S(N){if(F!=="soft-hyphen")return!1;let M=Q[N];if(M===null)return!1;let v=q.preferPrefixWidthsForBreakableRuns?f[N]??M:M,w=v!==M,{fitCount:G,fittedWidth:l}=y0(v,K,_,D,V,w);if(G===0)return!1;if(K=l,y=N,A=G,P(),G===M.length)return y=N+1,A=0,!0;return E(N,G,l+V),o(N,G),!0}function U(N){b++,J?.({startSegmentIndex:N.startSegmentIndex,startGraphemeIndex:0,endSegmentIndex:N.consumedEndSegmentIndex,endGraphemeIndex:0,width:0}),P()}for(let N=0;N<u.length;N++){let M=u[N];if(M.startSegmentIndex===M.endSegmentIndex){U(M);continue}j=!1,K=0,B=M.startSegmentIndex,k=0,y=M.startSegmentIndex,A=0,P();let v=M.startSegmentIndex;while(v<M.endSegmentIndex){let w=Z[v],G=w==="tab"?w0(K,$):Y[v];if(w==="soft-hyphen"){if(j)y=v+1,A=0,T=v+1,L=K+V,C=K+V,F=w;v++;continue}if(!j){if(G>_&&Q[v]!==null)I(v);else H(v,G);c(v,G),v++;continue}if(K+G>_+D){let n=K+(w==="tab"?0:X[v]),e=K+(w==="tab"?G:R[v]);if(F==="soft-hyphen"&&q.preferEarlySoftHyphenBreak&&L<=_+D){E(T,0,C);continue}if(F==="soft-hyphen"&&S(v)){v++;continue}if(m(w)&&n<=_+D){W(v,G),E(v+1,0,e),v++;continue}if(T>=0&&L<=_+D){E(T,0,C);continue}if(G>_&&Q[v]!==null){E(),I(v),v++;continue}E();continue}W(v,G),c(v,G),v++}if(j){let w=T===M.consumedEndSegmentIndex?C:K;E(M.consumedEndSegmentIndex,0,w)}}return b}function S0(O,_,J){let Y=kO(O,_);if(Y===null)return null;if(O.simpleLineWalkFastPath)return oO(O,Y,J);let X=L0(O,Y.segmentIndex);if(X<0)return null;let R=O.chunks[X];if(R.startSegmentIndex===R.endSegmentIndex)return{startSegmentIndex:R.startSegmentIndex,startGraphemeIndex:0,endSegmentIndex:R.consumedEndSegmentIndex,endGraphemeIndex:0,width:0};let{widths:Z,lineEndFitAdvances:Q,lineEndPaintAdvances:f,kinds:V,breakableWidths:$,breakablePrefixWidths:u,discretionaryHyphenWidth:q,tabStopAdvance:D}=O,b=h(),K=b.lineFitEpsilon,j=0,B=!1,k=Y.segmentIndex,y=Y.graphemeIndex,A=k,T=y,L=-1,C=0,F=0,P=null;function E(){L=-1,C=0,F=0,P=null}function H(U=A,N=T,M=j){if(!B)return null;return{startSegmentIndex:k,startGraphemeIndex:y,endSegmentIndex:U,endGraphemeIndex:N,width:M}}function z(U,N){B=!0,A=U+1,T=0,j=N}function W(U,N,M){B=!0,A=U,T=N+1,j=M}function c(U,N){if(!B){z(U,N);return}j+=N,A=U+1,T=0}function I(U,N){if(!m(V[U]))return;let M=V[U]==="tab"?0:Q[U],v=V[U]==="tab"?N:f[U];L=U+1,C=j-N+M,F=j-N+v,P=V[U]}function o(U,N){let M=$[U],v=u[U]??null;for(let w=N;w<M.length;w++){let G=t(M,v,w,b.preferPrefixWidthsForBreakableRuns);if(!B){W(U,w,G);continue}if(j+G>J+K)return H();j+=G,A=U,T=w+1}if(B&&A===U&&T===M.length)A=U+1,T=0;return null}function S(U){if(P!=="soft-hyphen"||L<0)return null;let N=$[U]??null;if(N!==null){let M=b.preferPrefixWidthsForBreakableRuns?u[U]??N:N,v=M!==N,{fitCount:w,fittedWidth:G}=y0(M,j,J,K,q,v);if(w===N.length)return j=G,A=U+1,T=0,E(),null;if(w>0)return H(U,w,G+q)}if(C<=J+K)return H(L,0,F);return null}for(let U=Y.segmentIndex;U<R.endSegmentIndex;U++){let N=V[U],M=U===Y.segmentIndex?Y.graphemeIndex:0,v=N==="tab"?w0(j,D):Z[U];if(N==="soft-hyphen"&&M===0){if(B)A=U+1,T=0,L=U+1,C=j+q,F=j+q,P=N;continue}if(!B){if(M>0){let G=o(U,M);if(G!==null)return G}else if(v>J&&$[U]!==null){let G=o(U,0);if(G!==null)return G}else z(U,v);I(U,v);continue}if(j+v>J+K){let G=j+(N==="tab"?0:Q[U]),l=j+(N==="tab"?v:f[U]);if(P==="soft-hyphen"&&b.preferEarlySoftHyphenBreak&&C<=J+K)return H(L,0,F);let n=S(U);if(n!==null)return n;if(m(N)&&G<=J+K)return c(U,v),H(U+1,0,l);if(L>=0&&C<=J+K)return H(L,0,F);if(v>J&&$[U]!==null){let e=H();if(e!==null)return e;let v0=o(U,0);if(v0!==null)return v0}return H()}c(U,v),I(U,v)}if(L===R.consumedEndSegmentIndex&&T===0)return H(R.consumedEndSegmentIndex,0,F);return H(R.consumedEndSegmentIndex,0,j)}function oO(O,_,J){let{widths:Y,kinds:X,breakableWidths:R,breakablePrefixWidths:Z}=O,Q=h(),f=Q.lineFitEpsilon,V=0,$=!1,u=_.segmentIndex,q=_.graphemeIndex,D=u,b=q,K=-1,j=0;function B(C=D,F=b,P=V){if(!$)return null;return{startSegmentIndex:u,startGraphemeIndex:q,endSegmentIndex:C,endGraphemeIndex:F,width:P}}function k(C,F){$=!0,D=C+1,b=0,V=F}function y(C,F,P){$=!0,D=C,b=F+1,V=P}function A(C,F){if(!$){k(C,F);return}V+=F,D=C+1,b=0}function T(C,F){if(!m(X[C]))return;K=C+1,j=V-F}function L(C,F){let P=R[C],E=Z[C]??null;for(let H=F;H<P.length;H++){let z=t(P,E,H,Q.preferPrefixWidthsForBreakableRuns);if(!$){y(C,H,z);continue}if(V+z>J+f)return B();V+=z,D=C,b=H+1}if($&&D===C&&b===P.length)D=C+1,b=0;return null}for(let C=_.segmentIndex;C<Y.length;C++){let F=Y[C],P=X[C],E=C===_.segmentIndex?_.graphemeIndex:0;if(!$){if(E>0){let z=L(C,E);if(z!==null)return z}else if(F>J&&R[C]!==null){let z=L(C,0);if(z!==null)return z}else k(C,F);T(C,F);continue}if(V+F>J+f){if(m(P))return A(C,F),B(C+1,0,V-F);if(K>=0)return B(K,0,j);if(F>J&&R[C]!==null){let z=B();if(z!==null)return z;let W=L(C,0);if(W!==null)return W}return B()}A(C,F),T(C,F)}return B()}var R0=null,C0=new WeakMap;function I0(){if(R0===null)R0=new Intl.Segmenter(void 0,{granularity:"grapheme"});return R0}function lO(O){if(O)return{widths:[],lineEndFitAdvances:[],lineEndPaintAdvances:[],kinds:[],simpleLineWalkFastPath:!0,segLevels:null,breakableWidths:[],breakablePrefixWidths:[],discretionaryHyphenWidth:0,tabStopAdvance:0,chunks:[],segments:[]};return{widths:[],lineEndFitAdvances:[],lineEndPaintAdvances:[],kinds:[],simpleLineWalkFastPath:!0,segLevels:null,breakableWidths:[],breakablePrefixWidths:[],discretionaryHyphenWidth:0,tabStopAdvance:0,chunks:[]}}function c0(O,_,J){let Y=I0(),X=h(),{cache:R,emojiCorrection:Z}=B0(_,G0(O.normalized)),Q=g("-",x("-",R),Z),V=g(" ",x(" ",R),Z)*8;if(O.len===0)return lO(J);let $=[],u=[],q=[],D=[],b=O.chunks.length<=1,K=J?[]:null,j=[],B=[],k=J?[]:null,y=Array.from({length:O.len}),A=Array.from({length:O.len});function T(F,P,E,H,z,W,c,I){if(z!=="text"&&z!=="space"&&z!=="zero-width-break")b=!1;if($.push(P),u.push(E),q.push(H),D.push(z),K?.push(W),j.push(c),B.push(I),k!==null)k.push(F)}for(let F=0;F<O.len;F++){y[F]=$.length;let P=O.texts[F],E=O.isWordLike[F],H=O.kinds[F],z=O.starts[F];if(H==="soft-hyphen"){T(P,0,Q,Q,H,z,null,null),A[F]=$.length;continue}if(H==="hard-break"){T(P,0,0,0,H,z,null,null),A[F]=$.length;continue}if(H==="tab"){T(P,0,0,0,H,z,null,null),A[F]=$.length;continue}let W=x(P,R);if(H==="text"&&W.containsCJK){let S="",U=0;for(let N of Y.segment(P)){let M=N.segment;if(S.length===0){S=M,U=N.index;continue}if(i.has(S)||$0.has(M)||r.has(M)||X.carryCJKAfterClosingQuote&&p(M)&&D0(S)){S+=M;continue}let v=x(S,R),w=g(S,v,Z);T(S,w,w,w,"text",z+U,null,null),S=M,U=N.index}if(S.length>0){let N=x(S,R),M=g(S,N,Z);T(S,M,M,M,"text",z+U,null,null)}A[F]=$.length;continue}let c=g(P,W,Z),I=H==="space"||H==="preserved-space"||H==="zero-width-break"?0:c,o=H==="space"||H==="zero-width-break"?0:c;if(E&&P.length>1){let S=P0(P,W,R,Z),U=X.preferPrefixWidthsForBreakableRuns?A0(P,W,R,Z):null;T(P,c,I,o,H,z,S,U)}else T(P,c,I,o,H,z,null,null);A[F]=$.length}let L=hO(O.chunks,y,A),C=K===null?null:u0(O.normalized,K);if(k!==null)return{widths:$,lineEndFitAdvances:u,lineEndPaintAdvances:q,kinds:D,simpleLineWalkFastPath:b,segLevels:C,breakableWidths:j,breakablePrefixWidths:B,discretionaryHyphenWidth:Q,tabStopAdvance:V,chunks:L,segments:k};return{widths:$,lineEndFitAdvances:u,lineEndPaintAdvances:q,kinds:D,simpleLineWalkFastPath:b,segLevels:C,breakableWidths:j,breakablePrefixWidths:B,discretionaryHyphenWidth:Q,tabStopAdvance:V,chunks:L}}function hO(O,_,J){let Y=[];for(let X=0;X<O.length;X++){let R=O[X],Z=R.startSegmentIndex<_.length?_[R.startSegmentIndex]:J[J.length-1]??0,Q=R.endSegmentIndex<_.length?_[R.endSegmentIndex]:J[J.length-1]??0,f=R.consumedEndSegmentIndex<_.length?_[R.consumedEndSegmentIndex]:J[J.length-1]??0;Y.push({startSegmentIndex:Z,endSegmentIndex:Q,consumedEndSegmentIndex:f})}return Y}function o0(O,_,J,Y){let X=N0(O,h(),Y?.whiteSpace);return c0(X,_,J)}function V1(O,_,J){let Y=performance.now(),X=N0(O,h(),J?.whiteSpace),R=performance.now(),Z=c0(X,_,!1),Q=performance.now(),f=0;for(let V of Z.breakableWidths)if(V!==null)f++;return{analysisMs:R-Y,measureMs:Q-R,totalMs:Q-Y,analysisSegments:X.len,preparedSegments:Z.widths.length,breakableSegments:f}}function X1(O,_,J){return o0(O,_,!1,J)}function Y1(O,_,J){return o0(O,_,!0,J)}function F0(O){return O}function Z1(O,_,J){let Y=W0(F0(O),_);return{lineCount:Y,height:Y*J}}function k0(O,_,J){let Y=J.get(O);if(Y!==void 0)return Y;Y=[];let X=I0();for(let R of X.segment(_[O]))Y.push(R.segment);return J.set(O,Y),Y}function l0(O){let _=C0.get(O);if(_!==void 0)return _;return _=new Map,C0.set(O,_),_}function pO(O,_,J,Y){return Y>0&&O[Y-1]==="soft-hyphen"&&!(_===Y&&J>0)}function xO(O,_,J,Y,X,R,Z){let Q="",f=pO(_,Y,X,R);for(let V=Y;V<R;V++){if(_[V]==="soft-hyphen"||_[V]==="hard-break")continue;if(V===Y&&X>0)Q+=k0(V,O,J).slice(X).join("");else Q+=O[V]}if(Z>0){if(f)Q+="-";Q+=k0(R,O,J).slice(Y===R?X:0,Z).join("")}else if(f)Q+="-";return Q}function h0(O,_,J,Y,X,R,Z){return{text:xO(O.segments,O.kinds,_,Y,X,R,Z),width:J,start:{segmentIndex:Y,graphemeIndex:X},end:{segmentIndex:R,graphemeIndex:Z}}}function gO(O,_,J){return h0(O,_,J.width,J.startSegmentIndex,J.startGraphemeIndex,J.endSegmentIndex,J.endGraphemeIndex)}function p0(O){return{width:O.width,start:{segmentIndex:O.startSegmentIndex,graphemeIndex:O.startGraphemeIndex},end:{segmentIndex:O.endSegmentIndex,graphemeIndex:O.endGraphemeIndex}}}function mO(O,_,J){let Y=S0(O,_,J);if(Y===null)return null;return p0(Y)}function rO(O,_){return h0(O,l0(O),_.width,_.start.segmentIndex,_.start.graphemeIndex,_.end.segmentIndex,_.end.graphemeIndex)}function $1(O,_,J){if(O.widths.length===0)return 0;return J0(F0(O),_,(Y)=>{J(p0(Y))})}function Q1(O,_,J){let Y=mO(O,_,J);if(Y===null)return null;return rO(O,Y)}function q1(O,_,J){let Y=[];if(O.widths.length===0)return{lineCount:0,height:0,lines:Y};let X=l0(O),R=J0(F0(O),_,(Z)=>{Y.push(gO(O,X,Z))});return{lineCount:R,height:R*J,lines:Y}}function aO(){z0(),R0=null,C0=new WeakMap,T0()}function D1(O){j0(O),aO()}window.Pretext={walkLineRanges:$1,setLocale:D1,profilePrepare:V1,prepareWithSegments:Y1,prepare:X1,layoutWithLines:q1,layoutNextLine:Q1,layout:Z1,clearCache:aO};</script>
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const compact=n=>n>=1e6?+(n/1e6).toFixed(1)+'M':n>=1e3?+(n/1e3).toFixed(n%1e3?1:0)+'k':String(Math.round(n));
+const bdt=n=>{const a=Math.abs(n),s=Number.isInteger(a)?a.toLocaleString('en-US'):a.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return (n<0?'−':'')+'৳ '+s};
+const bdtS=n=>(n>0?'+':'')+bdt(n);
+const r2=n=>Math.round(n*100)/100;
+const safe=(f,d)=>{try{return f()}catch(e){return d}};
+const NOW='2026-10-02 10:42', TODAY='2026-10-02';
+const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const monthName=p=>MN[+p.split('-')[1]-1]+' '+p.split('-')[0];
+const monShort=p=>MN[+p.split('-')[1]-1].slice(0,3);
+
+/* ================= icons ================= */
+const IC={
+ home:'<path d="M3 11l9-8 9 8M5 9.5V20h5v-6h4v6h5V9.5"/>',
+ bank:'<path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
+ card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+ doc:'<path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+ key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+ qr:'<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM19 14v2M14 19h2M18 18h2v2"/>',
+ out:'<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>',
+ bell:'<path d="M6 8a6 6 0 0112 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 004 0"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+ menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+ x:'<path d="M6 6l12 12M18 6L6 18"/>',
+ dl:'<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+ up:'<path d="M12 21V9M7 14l5-5 5 5M4 3h16"/>',
+ chev:'<path d="M9 6l6 6-6 6"/>',
+ back:'<path d="M15 6l-6 6 6 6"/>',
+ warn:'<path d="M12 9v4M12 17h.01M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+ check:'<path d="M5 12l5 5 9-10"/>',
+ shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+ refresh:'<path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/>',
+ chart:'<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
+ eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+ copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>',
+ lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+ grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
+};
+const ic=(n,cls='')=>`<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]||''}</svg>`;
+
+/* ================= data ================= */
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(20261002);
+const PERIODS=['2026-04','2026-05','2026-06','2026-07','2026-08','2026-09'];
+const D={};
+D.inst=[
+ {id:'i1',name:'Shapla Commercial Bank',code:'SHB',type:'Commercial bank',status:'Active',onboarded:'2026-03-12',contact:'Rafiq Ahmed',email:'rafiq.ahmed@shaplabank.example',phone:'+880 1711-000111',base:60000,from:'2026-04',to:null,addr:'Motijheel C/A, Dhaka 1000'},
+ {id:'i2',name:'Karnaphuli Trust Bank',code:'KTB',type:'Commercial bank',status:'Active',onboarded:'2026-03-28',contact:'Sabina Yasmin',email:'sabina@karnaphulitrust.example',phone:'+880 1819-220334',base:24000,from:'2026-04',to:null,addr:'Agrabad C/A, Chattogram 4100'},
+ {id:'i3',name:'Surma Mercantile Bank',code:'SMB',type:'Commercial bank',status:'Active',onboarded:'2026-04-09',contact:'Jahid Hasan',email:'jahid.hasan@surmamercantile.example',phone:'+880 1915-448120',base:10000,from:'2026-04',to:null,addr:'Zindabazar, Sylhet 3100'},
+ {id:'i4',name:'Teesta Digital Bank',code:'TDB',type:'Digital bank',status:'Active',onboarded:'2026-06-18',contact:'Nusrat Jahan',email:'nusrat@teestadigital.example',phone:'+880 1711-902210',base:5200,from:'2026-07',to:null,addr:'Banani, Dhaka 1213'},
+ {id:'i5',name:'Nilgiri Commercial Bank',code:'NCB',type:'Commercial bank',status:'Pending',onboarded:'2026-09-24',contact:'Kamal Uddin',email:'kamal.uddin@nilgiricommercial.example',phone:'+880 1612-554001',base:0,from:null,to:null,addr:'Barishal Sadar, Barishal 8200'},
+ {id:'i6',name:'Chandra Islamic Bank',code:'CIB',type:'Islamic bank',status:'Suspended',onboarded:'2026-03-30',contact:'Mizanur Rahman',email:'mizan@chandraislamic.example',phone:'+880 1511-300772',base:7000,from:'2026-04',to:'2026-08',addr:'Rajshahi Sadar, Rajshahi 6000'},
+ {id:'i7',name:'Doyel Co-operative Bank',code:'DCB',type:'Co-operative bank',status:'Active',onboarded:'2026-05-21',contact:'Farzana Akter',email:'farzana@doyelcoop.example',phone:'+880 1311-870044',base:3000,from:'2026-06',to:null,addr:'Bogura Sadar, Bogura 5800'}
+];
+D.apps=[
+ {id:'a1',inst:'i1',name:'SHB Merchant App',status:'Active',created:'2026-03-14'},{id:'a2',inst:'i1',name:'SHB Internet Banking',status:'Active',created:'2026-03-14'},{id:'a3',inst:'i1',name:'SHB POS Gateway',status:'Suspended',created:'2026-05-02'},
+ {id:'a4',inst:'i2',name:'KTB Mobile',status:'Active',created:'2026-04-01'},{id:'a5',inst:'i3',name:'Surma Pay',status:'Active',created:'2026-04-11'},
+ {id:'a6',inst:'i4',name:'Teesta Wallet',status:'Active',created:'2026-06-20'},{id:'a7',inst:'i6',name:'Chandra Agent Banking',status:'Suspended',created:'2026-04-02'},{id:'a8',inst:'i7',name:'Doyel Teller',status:'Active',created:'2026-05-23'}
+];
+D.certs={i1:{subject:'CN=api.shaplabank.example, O=Shapla Commercial Bank',issuer:'RVL Issuing CA G2',expires:'2026-11-09',thumb:'7F:3A:91:C2:0D:5B:E8:44:19:AA:60:12:C7:B3:5E:90'},i2:{subject:'CN=gateway.karnaphulitrust.example',issuer:'RVL Issuing CA G2',expires:'2027-03-02',thumb:'A1:09:F4:7C:55:E2:3B:80:6D:12:C9:47:8E:20:BB:34'},i3:{subject:'CN=pay.surmamercantile.example',issuer:'RVL Issuing CA G2',expires:'2027-04-10',thumb:'3C:E8:12:A0:77:B5:D9:41:F0:2A:6E:8B:93:C4:10:57'},i4:{subject:'CN=api.teestadigital.example',issuer:'RVL Issuing CA G2',expires:'2027-06-18',thumb:'D4:61:0B:EE:92:3F:A7:15:C8:50:79:2D:B1:E6:04:9A'},i6:{subject:'CN=agent.chandraislamic.example',issuer:'RVL Issuing CA G2',expires:'2027-03-30',thumb:'09:BE:57:A2:CC:71:1F:84:30:E5:D2:6B:48:97:AD:F3'},i7:{subject:'CN=teller.doyelcoop.example',issuer:'RVL Issuing CA G2',expires:'2027-05-21',thumb:'6A:D0:35:F9:82:1C:B7:4E:A3:08:5D:E1:90:2F:C6:74'}};
+D.keys=[
+ {id:'k1',inst:'i1',kid:'shb-es256-2026-03',alg:'ES256',status:'Active',created:'2026-03-14',gens:1},{id:'k2',inst:'i2',kid:'ktb-es256-2026-04',alg:'ES256',status:'Active',created:'2026-04-01',gens:1},
+ {id:'k3',inst:'i3',kid:'smb-es256-2026-04',alg:'ES256',status:'Active',created:'2026-04-11',gens:1},{id:'k4',inst:'i4',kid:'tdb-es256-2026-06',alg:'ES256',status:'Active',created:'2026-06-20',gens:1},
+ {id:'k6',inst:'i6',kid:'cib-es256-2026-04',alg:'ES256',status:'Active',created:'2026-04-02',gens:1},{id:'k7',inst:'i7',kid:'dcb-es256-2026-05',alg:'ES256',status:'Active',created:'2026-05-23',gens:1}
+];
+D.cards=[
+ {id:'r1',inst:'i1',from:'2026-03-01',gen:0.50,val:0.20},{id:'r2',inst:'i1',from:'2026-07-01',gen:0.45,val:0.18},{id:'r3',inst:'i1',from:'2026-11-01',gen:0.42,val:0.17},
+ {id:'r4',inst:'i2',from:'2026-04-01',gen:0.50,val:0.20},{id:'r5',inst:'i3',from:'2026-04-01',gen:0.50,val:0.20},{id:'r6',inst:'i4',from:'2026-07-01',gen:0.50,val:0.20},
+ {id:'r7',inst:'i6',from:'2026-04-01',gen:0.50,val:0.20},{id:'r8',inst:'i7',from:'2026-06-01',gen:0.48,val:0.19}
+];
+D.adj=[
+ {id:'ad1',inst:'i2',period:'2026-09',amount:-500,reason:'Credit: duplicate validation burst on 14 Sep (INC-2291)',status:'Pending',by:'nadia.brian@rvl.example',at:'2026-09-29 15:10'},
+ {id:'ad2',inst:'i4',period:'2026-09',amount:250,reason:'Onboarding support hours, as per agreement',status:'Pending',by:'nadia.brian@rvl.example',at:'2026-09-30 11:02'},
+ {id:'ad3',inst:'i1',period:'2026-08',amount:-1200,reason:'Credit: rate card correction effective July',status:'Applied',by:'nadia.brian@rvl.example',at:'2026-08-27 10:31'},
+ {id:'ad4',inst:'i3',period:'2026-07',amount:300,reason:'Manual certificate re-issue fee',status:'Applied',by:'nadia.brian@rvl.example',at:'2026-07-29 16:45'}
+];
+D.late=[
+ {id:'ob-7731',inst:'i4',meter:'GENERATION_DYNAMIC',at:'2026-09-30 23:58',status:'Queued'},
+ {id:'ob-7732',inst:'i4',meter:'VALIDATION',at:'2026-09-30 23:59',status:'Queued'}
+];
+D.periodMeta={};
+PERIODS.forEach((p,i)=>{D.periodMeta[p]=i<5?{status:'Finalized',by:'nadia.brian@rvl.example',at:`${p==='2026-04'?'2026-05':'2026-'+String(+p.slice(5)+1).padStart(2,'0')}-0${3+(i%3)} 1${i}:2${i}`}:{status:'Draft',calc:'2026-10-02 09:14'}});
+D.counts={};
+D.inst.forEach(x=>{D.counts[x.id]={};PERIODS.forEach((p,k)=>{if(!x.base||!x.from||p<x.from||(x.to&&p>x.to))return;const b=x.base*(0.78+0.07*k)*(0.94+R()*0.12);D.counts[x.id][p]={sg:Math.round(b*0.2),dg:Math.round(b*0.8),v:Math.round(b*1.02)}})});
+D.counts.i4['2026-09'].dg-=0; /* Teesta has late events outstanding */
+D.accounts=[
+ {id:'admin@rvl.example',pw:'Demo@1234',name:'Tanvir Hasan',role:'admin',surface:'staff',title:'Platform Admin'},
+ {id:'finance@rvl.example',pw:'Demo@1234',name:'Nadia Brian',role:'finance',surface:'staff',title:'Finance'},
+ {id:'ops@shaplabank.example',pw:'Demo@1234',name:'Rafiq Ahmed',role:'fi',surface:'fi',title:'Shapla Commercial Bank',inst:'i1'}
+];
+/* usage events for Shapla Bank (FI view) */
+D.events=(function(){const out=[];const refs=['POS','INV','WEB','APP'];let t=new Date('2026-10-02T10:40:00');
+ for(let i=0;i<260;i++){t=new Date(t.getTime()-Math.round(1+R()*9)*60000*(R()<.1?18:1));const x=R();let meter,verdict,billable;
+  if(x<.16){meter='GENERATION_STATIC';verdict='GENERATED';billable=true}else if(x<.52){meter='GENERATION_DYNAMIC';verdict='GENERATED';billable=true}
+  else{meter='VALIDATION';const y=R();verdict=y<.86?'VALID':y<.95?'INVALID':y<.98?'INDETERMINATE':'ERROR';billable=verdict==='VALID'||verdict==='INVALID'}
+  const p=n=>String(n).padStart(2,'0');const ts=`${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
+  out.push({id:'ue_'+(88410-i*3-Math.floor(R()*3)).toString(16).padStart(6,'0'),at:ts,meter,verdict,billable,ref:refs[Math.floor(R()*4)]+'-'+String(10000+Math.floor(R()*89999))})}
+ return out})();
+D.octCounts={i1:{sg:812,dg:3190,v:4122}};
+
+/* ================= domain ================= */
+const inst=id=>D.inst.find(x=>x.id===id);
+function rateFor(id,p){const c=D.cards.filter(c=>c.inst===id&&c.from<=p+'-01').sort((a,b)=>b.from.localeCompare(a.from));return c[0]||null}
+function stmt(id,p){const c=(D.counts[id]||{})[p];if(!c)return null;const rc=rateFor(id,p);if(!rc)return null;
+ const ga=r2((c.sg+c.dg)*rc.gen), va=r2(c.v*rc.val), sub=r2(ga+va), adjs=D.adj.filter(a=>a.inst===id&&a.period===p), adj=r2(adjs.reduce((s,a)=>s+a.amount,0));
+ return {inst:id,period:p,sg:c.sg,dg:c.dg,v:c.v,gen:rc.gen,val:rc.val,cardFrom:rc.from,ga,va,sub,adjs,adj,total:r2(sub+adj),late:D.late.filter(l=>l.inst===id&&l.status==='Queued').length}}
+function periodStmts(p){return D.inst.map(x=>stmt(x.id,p)).filter(Boolean)}
+function periodTotals(p){const s=periodStmts(p);return {s,sg:sum(s,'sg'),dg:sum(s,'dg'),v:sum(s,'v'),sub:r2(sum(s,'sub')),adj:r2(sum(s,'adj')),total:r2(sum(s,'total'))}}
+function sum(a,k){return a.reduce((t,x)=>t+x[k],0)}
+const chipFor=s=>({Active:'ok',Finalized:'ok',Applied:'ok',Complete:'ok',Valid:'ok',VALID:'ok',GENERATED:'ok',Pending:'info',Draft:'warn',Queued:'warn',Suspended:'warn',INDETERMINATE:'warn',Terminated:'bad',INVALID:'bad',ERROR:'bad'}[s]||'info');
+const chip=(s,label)=>`<span class="chip ${chipFor(s)}">${esc(label||s)}</span>`;
+const meterLabel=m=>({GENERATION_STATIC:'Static generation',GENERATION_DYNAMIC:'Dynamic generation',VALIDATION:'Validation'}[m]||m);
+function openIssues(){return D.late.filter(l=>l.status==='Queued').length+D.adj.filter(a=>a.status==='Pending').length}
+
+/* ================= state / auth ================= */
+const S={user:null,tab:'fi',ui:{}};
+const ui=()=>S.ui;
+function resetUi(){S.ui={instQ:'',instStatus:'all',instTab:'overview',period:'2026-09',repTab:'late',adjStatus:'all',usageQ:'',usageMeter:'all',usageResult:'all',usageFrom:'',usageTo:'',usagePage:1,qrText:'',qrOut:null,stmtPeriod:'2026-09',accTab:'profile'}}
+resetUi();
+const can=r=>S.user&&(S.user.role===r);
+const home=()=>S.user.surface==='staff'?'#/staff/overview':'#/fi/overview';
+function navFor(u){
+ if(u.surface==='fi')return [['overview','Overview','home'],['usage','Usage','chart'],['statements','Statements','doc'],['apps','Applications & certificate','shield'],['account','Account','user']];
+ if(u.role==='admin')return [['overview','Overview','home'],['institutions','Institutions','bank'],['keys','Crypto keys','key'],['inspector','QR inspector','qr']];
+ return [['overview','Overview','home'],['institutions','Institutions','bank'],['_h','Billing'],['rates','Rate cards','card'],['periods','Billing periods','doc'],['adjustments','Adjustments','plus'],['reports','Reports','flag']];
+}
+function allowed(u,page){return navFor(u).some(n=>n[0]===page)||page==='institution'&&u.surface==='staff'}
+
+/* ================= router ================= */
+function parse(){const h=location.hash.replace(/^#\/?/,'');const [surf,page,arg]=h.split('/');return {surf,page,arg}}
+function go(h){if(location.hash===h)render();else location.hash=h}
+window.addEventListener('hashchange',()=>{closeOverlay();render(true)});
+
+/* ================= overlays ================= */
+function closeOverlay(){$('#overlay').innerHTML='';document.body.style.overflow=''}
+function openDrawer({title,body,footer='',wide=false,onOpen}){
+ $('#overlay').innerHTML=`<div class="scrim" data-act="close"></div><aside class="drawer ${wide?'wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h3>${esc(title)}</h3><button class="ib" data-act="close" aria-label="Close">${ic('x')}</button></header><div class="body">${body}</div>${footer?`<footer>${footer}</footer>`:''}</aside>`;
+ document.body.style.overflow='hidden';const f=$('#overlay input:not([readonly]),#overlay select,#overlay textarea');if(f)setTimeout(()=>f.focus(),60);if(onOpen)onOpen();}
+function openModal({title,text,html='',ok='Confirm',danger=false,onOk,cancel=true}){
+ $('#overlay').innerHTML=`<div class="scrim" data-act="close"></div><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><h3>${esc(title)}</h3><p>${text||''}</p>${html}<div class="acts">${cancel?'<button class="btn" data-act="close">Cancel</button>':''}<button class="btn ${danger?'dngf':'pri'}" id="modalOk">${esc(ok)}</button></div></div>`;
+ $('#modalOk').onclick=()=>{if(onOk)onOk();};setTimeout(()=>$('#modalOk').focus(),50);}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeOverlay();$$('.pop').forEach(p=>p.remove())}});
+function toast(msg,bad){const el=document.createElement('div');el.className='toast'+(bad?' bad':'');el.innerHTML=ic(bad?'warn':'check')+'<span>'+esc(msg)+'</span>';$('#toasts').appendChild(el);setTimeout(()=>el.remove(),3200)}
+function fieldErr(id,msg){const f=$('#'+id)?.closest('.f');if(!f)return;f.classList.toggle('err',!!msg);const e=f.querySelector('.e');if(e)e.textContent=msg||''}
+function download(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function csv(rows){return rows.map(r=>r.map(c=>{c=String(c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(',')).join('\n')}
+
+/* ================= shared views ================= */
+function barChart(data,opts={}){
+ const W=640,H=230,pl=48,pr=8,pt=12,pb=28,iw=W-pl-pr,ih=H-pt-pb;const max=Math.max(...data.map(d=>d.a+d.b),1);const top=Math.ceil(max/4/(10**(String(Math.round(max)).length-2)))*(10**(String(Math.round(max)).length-2))*4||max;
+ const bw=Math.min(54,iw/data.length*0.52);let g='';
+ for(let i=0;i<=4;i++){const y=pt+ih-ih*i/4;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="${i?'3 4':'0'}"/><text x="${pl-8}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--text-3)">${opts.fmtAxis?opts.fmtAxis(top*i/4):compact(top*i/4)}</text>`}
+ data.forEach((d,i)=>{const cx=pl+iw/data.length*(i+.5);const ha=ih*d.a/top,hb=ih*d.b/top;
+  g+=`<g><title>${esc(d.label)}: ${esc(opts.aName||'Generations')} ${fmt(d.a)}, ${esc(opts.bName||'Validations')} ${fmt(d.b)}</title><rect x="${cx-bw/2}" y="${pt+ih-hb}" width="${bw}" height="${hb}" rx="3" fill="var(--c1)" opacity="${d.draft?.55:1}"/><rect x="${cx-bw/2}" y="${pt+ih-hb-ha}" width="${bw}" height="${ha}" rx="3" fill="var(--c2)" opacity="${d.draft?.55:1}"/></g><text x="${cx}" y="${H-8}" text-anchor="middle" font-size="11.5" fill="var(--text-3)">${esc(d.label)}</text>`});
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(opts.aria||'Chart')}" style="display:block">${g}</svg>`}
+function pager(total,page,per,act){const pages=Math.max(1,Math.ceil(total/per));const from=total?(page-1)*per+1:0,to=Math.min(total,page*per);
+ let b=`<button data-act="${act}" data-p="${page-1}" ${page<=1?'disabled':''} aria-label="Previous page">‹</button>`;
+ const win=[];for(let p=1;p<=pages;p++)if(p===1||p===pages||Math.abs(p-page)<=1)win.push(p);let last=0;
+ win.forEach(p=>{if(p-last>1)b+='<button disabled>…</button>';b+=`<button class="${p===page?'on':''}" data-act="${act}" data-p="${p}" ${p===page?'aria-current="page"':''}>${p}</button>`;last=p});
+ b+=`<button data-act="${act}" data-p="${page+1}" ${page>=pages?'disabled':''} aria-label="Next page">›</button>`;
+ return `<div class="pager"><span>Showing <b class="num">${from}–${to}</b> of <b class="num">${fmt(total)}</b></span><div class="pg">${b}</div></div>`}
+function pageHead(title,sub,acts='',extra=''){return `<div class="ph"><div><h2>${title}${extra}</h2>${sub?`<p data-pretext>${sub}</p>`:''}</div><div class="acts">${acts}</div></div>`}
+function emptyRow(cols,t,s){return `<tr><td colspan="${cols}"><div class="empty"><b>${t}</b>${s||''}</div></td></tr>`}
+
+/* ================= STAFF pages ================= */
+function pgStaffOverview(){
+ const u=S.user,last=periodTotals('2026-09'),prev=periodTotals('2026-08');
+ const active=D.inst.filter(i=>i.status==='Active').length;
+ const issues=openIssues();
+ const chart=barChart(PERIODS.map(p=>{const t=periodTotals(p);return {label:monShort(p),a:t.sg+t.dg,b:t.v,draft:D.periodMeta[p].status==='Draft'}}),{aria:'Monthly billable calls, generations and validations'});
+ const top=last.s.slice().sort((a,b)=>b.total-a.total);
+ const hero=u.role==='finance'
+  ?`<div class="hero"><div><h2>September 2026 is ready to close</h2><p data-pretext>${D.late.some(l=>l.status==='Queued')?`${D.late.filter(l=>l.status==='Queued').length} usage events are still queued. Resolve them, then finalize the month.`:'All usage is delivered. Review the draft statements and finalize the month.'}</p></div><a class="btn pri" href="#/staff/periods">Open billing period ${ic('chev')}</a></div>`
+  :`<div class="hero"><div><h2>Good morning, ${esc(u.name.split(' ')[0])}</h2><p data-pretext>${active} institutions are live, ${D.inst.filter(i=>i.status==='Pending').length} awaiting activation. Onboard a new institution or review certificates nearing expiry.</p></div><button class="btn pri" data-act="addInst">${ic('plus')} Add institution</button></div>`;
+ const attn=[];
+ if(D.late.some(l=>l.status==='Queued'))attn.push(['warn','warn',`${D.late.filter(l=>l.status==='Queued').length} usage events queued`,'Teesta Digital Bank · blocks finalizing','#/staff/reports']);
+ const pend=D.adj.filter(a=>a.status==='Pending').length;if(pend)attn.push(['info','info',`${pend} pending adjustments`,'Applied when 2026-09 is finalized','#/staff/adjustments']);
+ attn.push(['warn','clock','Certificate expires in 38 days','Shapla Commercial Bank · 9 Nov 2026','#/staff/institution/i1']);
+ const pi=D.inst.filter(i=>i.status==='Pending')[0];if(pi)attn.push(['info','bank','Activation pending',esc(pi.name)+' · onboarded '+pi.onboarded,'#/staff/institution/'+pi.id]);
+ const periodState=D.periodMeta['2026-09'].status;
+ return hero+`
+ <div class="grid g4 mb">
+  <div class="card kpi"><small><span class="ico">${ic('bank')}</span>Live institutions</small><div class="v num">${active}<span class="muted" style="font-size:16px;font-weight:500"> / ${D.inst.length}</span></div><div class="s">${D.inst.filter(i=>i.status==='Pending').length} pending · ${D.inst.filter(i=>i.status==='Suspended').length} suspended</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('qr')}</span>Billable calls · Sep</small><div class="v num">${fmt(last.sg+last.dg+last.v)}</div><div class="s ${last.sg+last.dg+last.v>=prev.sg+prev.dg+prev.v?'pos':'neg'}">${(((last.sg+last.dg+last.v)/(prev.sg+prev.dg+prev.v)-1)*100).toFixed(1)}% vs August</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('card')}</span>September total</small><div class="v num">${bdt(last.total)}</div><div class="s">${periodState==='Draft'?'Draft · not yet finalized':'Finalized'}</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('flag')}</span>Open items</small><div class="v num">${issues}</div><div class="s">${issues?'Need attention before month close':'All clear'}</div></div>
+ </div>
+ <div class="grid g-main mb">
+  <section class="card"><div class="ch"><h3>Billable calls by month</h3><span class="grow"></span><div class="legend"><span><i style="background:var(--c2)"></i>Generations</span><span><i style="background:var(--c1)"></i>Validations</span></div></div><div class="pad">${chart}</div></section>
+  <section class="card"><div class="ch"><h3>Needs attention</h3></div><div class="list">${attn.map(a=>`<a class="row" href="${a[4]}"><span class="ico ${a[0]}">${ic(a[1])}</span><div class="grow"><b style="display:block">${a[2]}</b><span class="muted" style="font-size:12.5px">${a[3]}</span></div>${ic('chev')}</a>`).join('')}</div></section>
+ </div>
+ <section class="card"><div class="ch"><h3>Institutions · September 2026</h3><span class="grow"></span><a class="btn sm" href="#/staff/${u.role==='finance'?'periods':'institutions'}">View all</a></div>
+ <div class="tw"><table><thead><tr><th>Institution</th><th class="r">Billable calls</th><th class="r">Total</th><th style="width:22%">Share of month</th></tr></thead><tbody>
+ ${top.map(s=>`<tr class="click" data-act="goto" data-h="#/staff/institution/${s.inst}"><td class="two"><b>${esc(inst(s.inst).name)}</b><small>${esc(inst(s.inst).code)}</small></td><td class="r num">${fmt(s.sg+s.dg+s.v)}</td><td class="r num"><b>${bdt(s.total)}</b></td><td><div class="bar"><i style="width:${(s.total/last.total*100).toFixed(1)}%"></i></div></td></tr>`).join('')}
+ </tbody></table></div></section>`}
+
+function filteredInst(){const q=ui().instQ.trim().toLowerCase();return D.inst.filter(i=>(ui().instStatus==='all'||i.status===ui().instStatus)&&(!q||(i.name+i.code+i.contact+i.email).toLowerCase().includes(q)))}
+function pgInstitutions(){
+ const list=filteredInst();
+ return pageHead('Institutions','Financial institutions onboarded to Secure Bangla QR. Select a row for applications, certificates, credentials and billing.',can('admin')?`<button class="btn pri" data-act="addInst">${ic('plus')} Add institution</button>`:'')+
+ `<section class="card"><div class="tools"><label class="fld" style="flex:1;min-width:220px">${ic('search')}<input id="instQ" data-in="instQ" value="${esc(ui().instQ)}" placeholder="Search name, code, contact" aria-label="Search institutions" style="flex:1"></label>
+ <label class="fld"><select data-in="instStatus" aria-label="Status filter"><option value="all">All statuses</option>${['Active','Pending','Suspended','Terminated'].map(s=>`<option ${ui().instStatus===s?'selected':''}>${s}</option>`).join('')}</select></label></div>
+ <div class="tw"><table><thead><tr><th>Institution</th><th>Type</th><th>Contact</th><th>Onboarded</th><th class="r">Apps</th><th>Status</th><th></th></tr></thead><tbody>
+ ${list.length?list.map(i=>`<tr class="click" data-act="goto" data-h="#/staff/institution/${i.id}"><td class="two"><b>${esc(i.name)}</b><small>${esc(i.code)}</small></td><td>${esc(i.type)}</td><td class="two"><b style="font-weight:500">${esc(i.contact)}</b><small>${esc(i.email)}</small></td><td class="num nowrap">${i.onboarded}</td><td class="r num">${D.apps.filter(a=>a.inst===i.id).length}</td><td>${chip(i.status)}</td><td class="r muted">${ic('chev')}</td></tr>`).join(''):emptyRow(7,'No institutions match','Try a different search or status.')}
+ </tbody></table></div><div class="pager"><span>${list.length} of ${D.inst.length} institutions</span></div></section>`}
+
+function pgInstitution(id){
+ const i=inst(id);if(!i)return pageHead('Institution not found','<a class="link" href="#/staff/institutions">Back to institutions</a>');
+ const t=ui().instTab;const admin=can('admin');
+ const acts=admin?`${i.status==='Pending'?`<button class="btn pri" data-act="setStatus" data-id="${i.id}" data-s="Active">Activate</button>`:''}${i.status==='Active'?`<button class="btn" data-act="setStatus" data-id="${i.id}" data-s="Suspended">Suspend</button>`:''}${i.status==='Suspended'?`<button class="btn pri" data-act="setStatus" data-id="${i.id}" data-s="Active">Reactivate</button>`:''}${i.status!=='Terminated'&&i.status!=='Pending'?`<button class="btn dng" data-act="setStatus" data-id="${i.id}" data-s="Terminated">Terminate</button>`:''}`:'';
+ const tabs=[['overview','Overview'],['apps','Applications'],['cert','Certificate & credentials'],['billing','Billing']];
+ let body='';
+ if(t==='overview')body=`<div class="grid g2"><section class="card"><div class="ch"><h3>Organisation</h3></div><div class="pad"><dl class="kv"><dt>Legal name</dt><dd>${esc(i.name)}</dd><dt>Code</dt><dd>${esc(i.code)}</dd><dt>Type</dt><dd>${esc(i.type)}</dd><dt>Address</dt><dd>${esc(i.addr)}</dd><dt>Onboarded</dt><dd>${i.onboarded}</dd></dl></div></section><section class="card"><div class="ch"><h3>Primary contact</h3></div><div class="pad"><dl class="kv"><dt>Name</dt><dd>${esc(i.contact)}</dd><dt>Email</dt><dd>${esc(i.email)}</dd><dt>Phone</dt><dd>${esc(i.phone)}</dd><dt>Emergency</dt><dd>${esc(i.email)}</dd></dl></div></section></div>`;
+ if(t==='apps'){const apps=D.apps.filter(a=>a.inst===id);body=`<section class="card"><div class="ch"><h3>Applications</h3><span class="grow"></span>${admin&&i.status!=='Terminated'?`<button class="btn sm pri" data-act="addApp" data-id="${id}">${ic('plus')} Add application</button>`:''}</div><div class="tw"><table><thead><tr><th>Application</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>${apps.length?apps.map(a=>`<tr><td><b>${esc(a.name)}</b></td><td class="num">${a.created}</td><td>${chip(a.status)}</td><td class="r">${admin?`<button class="btn sm" data-act="toggleApp" data-id="${a.id}">${a.status==='Active'?'Suspend':'Reinstate'}</button>`:''}</td></tr>`).join(''):emptyRow(4,'No applications yet','Add the first application to issue credentials.')}</tbody></table></div></section>`}
+ if(t==='cert'){const c=D.certs[id];body=`<div class="grid g2"><section class="card"><div class="ch"><h3>mTLS client certificate</h3></div><div class="pad">${c?`<dl class="kv"><dt>Subject</dt><dd class="mono">${esc(c.subject)}</dd><dt>Issuer</dt><dd>${esc(c.issuer)}</dd><dt>Expires</dt><dd>${c.expires} ${c.expires<'2026-12-01'?chip('Draft','Expires soon'):''}</dd><dt>Thumbprint</dt><dd class="mono">${c.thumb}</dd></dl>${admin?`<div class="acts" style="margin-top:18px"><button class="btn" data-act="replaceCert" data-id="${id}">${ic('up')} Replace certificate</button><button class="btn dng" data-act="revokeCert" data-id="${id}">Revoke</button></div>`:''}`:`<div class="empty"><b>No certificate uploaded</b>${admin?`<button class="btn pri" style="margin-top:12px" data-act="replaceCert" data-id="${id}">${ic('up')} Upload certificate</button>`:''}</div>`}</div></section>
+ <section class="card"><div class="ch"><h3>API credential</h3></div><div class="pad"><p class="t2" style="margin-top:0">Client-credentials grant. The secret is shown <b>once</b> at provisioning and cannot be retrieved afterwards.</p><dl class="kv"><dt>Client ID</dt><dd class="mono">${esc(i.code.toLowerCase())}-prod-${i.id}</dd><dt>Scopes</dt><dd>qr:generate · qr:validate</dd><dt>Token lifetime</dt><dd>10 minutes</dd></dl>${admin&&i.status==='Active'?`<div class="acts" style="margin-top:18px"><button class="btn pri" data-act="provision" data-id="${id}">${ic('key')} Provision new secret</button></div>`:''}</div></section></div>`}
+ if(t==='billing'){const rc=rateFor(id,'2026-10');const rows=PERIODS.slice().reverse().map(p=>stmt(id,p)).filter(Boolean);body=`<div class="grid g-main"><section class="card"><div class="ch"><h3>Statements</h3></div><div class="tw"><table><thead><tr><th>Period</th><th class="r">Calls</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>${rows.length?rows.map(s=>`<tr class="click" data-act="stmtDrawer" data-i="${id}" data-p="${s.period}"><td><b>${monthName(s.period)}</b></td><td class="r num">${fmt(s.sg+s.dg+s.v)}</td><td class="r num"><b>${bdt(s.total)}</b></td><td>${chip(D.periodMeta[s.period].status)}</td></tr>`).join(''):emptyRow(4,'No billing yet','Statements appear after the first month of usage.')}</tbody></table></div></section>
+ <section class="card"><div class="ch"><h3>Rate card in effect</h3></div><div class="pad">${rc?`<dl class="kv"><dt>Effective</dt><dd>${rc.from}</dd><dt>Generation</dt><dd class="num">${bdt(rc.gen)} / call</dd><dt>Validation</dt><dd class="num">${bdt(rc.val)} / call</dd><dt>Currency</dt><dd>BDT</dd></dl>`:`<div class="empty"><b>No rate card</b>Usage can't be billed until one exists.</div>`}${can('finance')?`<div class="acts" style="margin-top:16px"><a class="btn sm" href="#/staff/rates">Manage rate cards</a></div>`:''}</div></section></div>`}
+ return `<div class="crumb mb" style="margin-bottom:10px"><a href="#/staff/institutions">Institutions</a> / ${esc(i.name)}</div>`+pageHead(esc(i.name),`${esc(i.type)} · ${esc(i.code)} · onboarded ${i.onboarded}`,acts,chip(i.status))+
+ `<div class="tabs" role="tablist">${tabs.map(x=>`<button role="tab" aria-selected="${t===x[0]}" class="${t===x[0]?'on':''}" data-act="instTab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`+body}
+
+function pgRates(){
+ const rows=D.cards.slice().sort((a,b)=>inst(a.inst).name.localeCompare(inst(b.inst).name)||b.from.localeCompare(a.from));
+ return pageHead('Rate cards','Per-call prices for each institution. A card applies from its effective date until the next card starts. Changes never alter a finalized month.',`<button class="btn pri" data-act="addRate">${ic('plus')} New rate card</button>`)+
+ `<section class="card"><div class="tw"><table><thead><tr><th>Institution</th><th>Effective from</th><th class="r">Generation / call</th><th class="r">Validation / call</th><th>Currency</th><th>State</th><th></th></tr></thead><tbody>
+ ${rows.map(c=>{const cur=rateFor(c.inst,'2026-10')?.id===c.id,fut=c.from>TODAY;return `<tr><td class="two"><b>${esc(inst(c.inst).name)}</b></td><td class="num">${c.from}</td><td class="r num">${bdt(c.gen)}</td><td class="r num">${bdt(c.val)}</td><td>BDT</td><td>${fut?chip('Pending','Scheduled'):cur?chip('Active','In effect'):chip('Terminated','Superseded').replace('bad','').replace('chip ','chip plain ')}</td><td class="r">${fut?`<button class="btn sm dng" data-act="delRate" data-id="${c.id}">Delete</button>`:`<span class="muted" style="font-size:12.5px" title="Used by billed periods">Locked</span>`}</td></tr>`}).join('')}
+ </tbody></table></div><div class="note">Only scheduled (future-dated) cards can be deleted. Cards used by a finalized period are locked.</div></section>`}
+
+function stmtTable(totals,period,clickable){
+ const fin=D.periodMeta[period].status==='Finalized';
+ return `<div class="tw"><table><thead><tr><th>Institution</th><th class="r">Static gen.</th><th class="r">Dynamic gen.</th><th class="r">Validations</th><th class="r">Subtotal</th><th class="r">Adjustments</th><th class="r">Total</th><th>Usage</th></tr></thead><tbody>
+ ${totals.s.length?totals.s.map(s=>`<tr class="${clickable?'click':''}" ${clickable?`data-act="stmtDrawer" data-i="${s.inst}" data-p="${period}"`:''}><td class="two"><b>${esc(inst(s.inst).name)}</b><small>Rate card from ${s.cardFrom}</small></td><td class="r num">${fmt(s.sg)}</td><td class="r num">${fmt(s.dg)}</td><td class="r num">${fmt(s.v)}</td><td class="r num">${bdt(s.sub)}</td><td class="r num ${s.adj<0?'neg':s.adj>0?'pos':''}">${s.adj?bdtS(s.adj):'—'}</td><td class="r num"><b>${bdt(s.total)}</b></td><td>${fin?chip('Complete'):s.late?chip('Queued',s.late+' queued'):chip('Complete')}</td></tr>`).join(''):emptyRow(8,'No usage in this period')}
+ </tbody>${totals.s.length?`<tfoot><tr><td>Total</td><td class="r num">${fmt(totals.sg)}</td><td class="r num">${fmt(totals.dg)}</td><td class="r num">${fmt(totals.v)}</td><td class="r num">${bdt(totals.sub)}</td><td class="r num ${totals.adj<0?'neg':''}">${totals.adj?bdtS(totals.adj):'—'}</td><td class="r num">${bdt(totals.total)}</td><td></td></tr></tfoot>`:''}</table></div>`}
+function pgPeriods(){
+ const p=ui().period,meta=D.periodMeta[p],fin=meta.status==='Finalized',T=periodTotals(p);const queued=D.late.filter(l=>l.status==='Queued').length,pend=D.adj.filter(a=>a.period===p&&a.status==='Pending').length;
+ const acts=`<label class="fld"><select data-in="period" aria-label="Billing period">${PERIODS.slice().reverse().map(x=>`<option value="${x}" ${x===p?'selected':''}>${x} · ${D.periodMeta[x].status}</option>`).join('')}</select></label>${!fin?`<button class="btn" data-act="recalc">${ic('refresh')} Recalculate</button><button class="btn pri" data-act="finalize">Finalize period</button>`:''}`;
+ return pageHead(monthName(p),fin?`Finalized by ${esc(meta.by)} on ${meta.at}. This month is locked: usage and statements cannot change.`:'Statements are calculated from the usage ledger and the rate card in effect. Finalizing locks the month; corrections go into a later period.',acts,chip(meta.status))+
+ `<div class="grid g4 mb">
+  <div class="card kpi"><small><span class="ico">${ic('qr')}</span>Billable generations</small><div class="v num">${fmt(T.sg+T.dg)}</div><div class="s">Static ${fmt(T.sg)} · Dynamic ${fmt(T.dg)}</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('shield')}</span>Billable validations</small><div class="v num">${fmt(T.v)}</div><div class="s">Conclusive verdicts only</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('plus')}</span>Adjustments (net)</small><div class="v num ${T.adj<0?'neg':''}">${T.adj?bdtS(T.adj):'৳ 0'}</div><div class="s">${D.adj.filter(a=>a.period===p).length} total${pend?` · ${pend} pending`:''}</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('card')}</span>Period total</small><div class="v num">${bdt(T.total)}</div><div class="s">${T.s.length} institutions · BDT</div></div>
+ </div>`+
+ (!fin&&queued?`<div class="banner warn" role="alert">${ic('warn')}<div><b>Usage not complete</b><div>${queued} usage events are still queued in the outbox. Finalizing is blocked until they are delivered. <a data-act="goto" data-h="#/staff/reports">Resolve in Reports</a></div></div></div>`:'')+
+ (!fin&&pend?`<div class="banner info">${ic('info')}<div><b>${pend} pending adjustment${pend>1?'s':''}</b><div>They are included in the totals below and become part of the statements on finalize. <a data-act="goto" data-h="#/staff/adjustments">Review adjustments</a></div></div></div>`:'')+
+ `<section class="card"><div class="ch"><h3>Statements</h3><span class="sub">Select a row for line items</span><span class="grow"></span><button class="btn sm" data-act="csvStatements">${ic('dl')} statements.csv</button><button class="btn sm" data-act="csvUsage">${ic('dl')} usage.csv</button></div>${stmtTable(T,p,true)}<div class="note">Statements are billing records, not tax invoices. Finance issues invoices from approved statements.</div></section>`}
+
+function pgAdjustments(){
+ const f=ui().adjStatus;const rows=D.adj.filter(a=>f==='all'||a.status===f).sort((a,b)=>b.at.localeCompare(a.at));
+ return pageHead('Adjustments','Credits and charges recorded against an institution and period. They enter the statement when the period is finalized.',`<button class="btn pri" data-act="addAdj">${ic('plus')} Record adjustment</button>`)+
+ `<section class="card"><div class="tools"><label class="fld"><select data-in="adjStatus" aria-label="Status filter"><option value="all">All</option><option ${f==='Pending'?'selected':''}>Pending</option><option ${f==='Applied'?'selected':''}>Applied</option></select></label><span class="grow"></span><span class="muted">${rows.length} adjustment${rows.length===1?'':'s'}</span></div>
+ <div class="tw"><table><thead><tr><th>Recorded</th><th>Institution</th><th>Period</th><th>Reason</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>
+ ${rows.length?rows.map(a=>`<tr><td class="two nowrap"><b style="font-weight:500">${a.at.slice(0,10)}</b><small>${esc(a.by.split('@')[0])}</small></td><td>${esc(inst(a.inst).name)}</td><td class="num">${a.period}</td><td style="max-width:340px">${esc(a.reason)}</td><td class="r num ${a.amount<0?'neg':'pos'}"><b>${bdtS(a.amount)}</b></td><td>${chip(a.status)}</td><td class="r">${a.status==='Pending'?`<button class="btn sm dng" data-act="delAdj" data-id="${a.id}">Remove</button>`:''}</td></tr>`).join(''):emptyRow(7,'No adjustments','Nothing matches this filter.')}
+ </tbody></table></div></section>`}
+
+function pgReports(){
+ const t=ui().repTab;const late=D.late.filter(l=>l.status==='Queued'),pend=D.adj.filter(a=>a.status==='Pending');
+ const tabs=[['late',`Late usage${late.length?` (${late.length})`:''}`],['pending',`Pending adjustments${pend.length?` (${pend.length})`:''}`]];
+ let body='';
+ if(t==='late')body=`<section class="card"><div class="ch"><h3>Usage events not yet delivered</h3><span class="sub">Outbox messages that missed the period close</span><span class="grow"></span>${late.length?`<button class="btn sm pri" data-act="requeueAll">Requeue all</button>`:''}</div><div class="tw"><table><thead><tr><th>Message</th><th>Institution</th><th>Meter</th><th>Occurred</th><th>Status</th><th></th></tr></thead><tbody>${late.length?late.map(l=>`<tr><td class="mono">${l.id}</td><td>${esc(inst(l.inst).name)}</td><td>${meterLabel(l.meter)}</td><td class="num">${l.at}</td><td>${chip(l.status)}</td><td class="r"><button class="btn sm" data-act="requeue" data-id="${l.id}">Requeue</button></td></tr>`).join(''):emptyRow(6,'Nothing outstanding','Every usage event for open periods has been delivered.')}</tbody></table></div></section>`;
+ else body=`<section class="card"><div class="ch"><h3>Adjustments waiting for a period close</h3></div><div class="tw"><table><thead><tr><th>Institution</th><th>Period</th><th>Reason</th><th class="r">Amount</th><th>Recorded by</th></tr></thead><tbody>${pend.length?pend.map(a=>`<tr><td>${esc(inst(a.inst).name)}</td><td class="num">${a.period}</td><td style="max-width:360px">${esc(a.reason)}</td><td class="r num ${a.amount<0?'neg':'pos'}"><b>${bdtS(a.amount)}</b></td><td>${esc(a.by)}</td></tr>`).join(''):emptyRow(5,'No pending adjustments')}</tbody></table></div><div class="note"><a class="link" data-act="goto" data-h="#/staff/adjustments">Go to Adjustments</a></div></section>`;
+ return pageHead('Reports','Checks Finance runs before closing a month.')+`<div class="tabs" role="tablist">${tabs.map(x=>`<button role="tab" class="${t===x[0]?'on':''}" data-act="repTab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`+body}
+
+function pgKeys(){
+ const rows=D.keys;const without=D.inst.filter(i=>i.status!=='Pending'&&!D.keys.some(k=>k.inst===i.id));
+ return pageHead('Crypto keys','Signing keys held in custody per institution. Rotating issues a new key; the previous key stays valid for verifying QR codes already issued.')+
+ `<section class="card"><div class="tw"><table><thead><tr><th>Institution</th><th>Key ID</th><th>Algorithm</th><th>Generation</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>
+ ${rows.map(k=>`<tr><td><b>${esc(inst(k.inst).name)}</b></td><td class="mono">${esc(k.kid)}</td><td>${k.alg}</td><td class="num">v${k.gens}</td><td class="num">${k.created}</td><td>${chip(k.status)}</td><td class="r"><button class="btn sm" data-act="rotateKey" data-id="${k.id}">${ic('refresh')} Rotate</button></td></tr>`).join('')}
+ ${without.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td class="muted">No key</td><td>—</td><td>—</td><td>—</td><td>${chip('Pending','Missing')}</td><td class="r"><button class="btn sm pri" data-act="createKey" data-id="${i.id}">Create key</button></td></tr>`).join('')}
+ </tbody></table></div><div class="note">Private key material never leaves custody. Only identifiers and status are shown here.</div></section>`}
+
+/* QR inspector: real EMV TLV parse + CRC16 */
+function crc16(str){let c=0xFFFF;for(let i=0;i<str.length;i++){c^=str.charCodeAt(i)<<8;for(let j=0;j<8;j++)c=(c&0x8000)?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF}return c.toString(16).toUpperCase().padStart(4,'0')}
+const tlv=(id,v)=>id+String(v.length).padStart(2,'0')+v;
+function buildQR(kind){let s=tlv('00','01')+tlv('01',kind==='static'?'11':'12')+tlv('26',tlv('00','bd.gov.bb.bqr')+tlv('01','SHB0000123456')+tlv('02','2087'))+tlv('52','5411')+tlv('53','050')+(kind==='dynamic'?tlv('54','1250.00'):'')+tlv('58','BD')+tlv('59','Mohakhali Fresh Mart')+tlv('60','Dhaka')+tlv('62',tlv('05',kind==='dynamic'?'INV-30417':'STORE01'));s+='6304';return s+crc16(s)}
+function parseTLV(s){const out=[];let i=0;while(i<s.length){const id=s.substr(i,2),len=parseInt(s.substr(i+2,2),10);if(!/^\d{2}$/.test(id)||isNaN(len)||i+4+len>s.length)throw new Error('Malformed TLV near position '+i);out.push({id,len,val:s.substr(i+4,len)});i+=4+len}return out}
+const TAGN={'00':'Payload format indicator','01':'Point of initiation','52':'Merchant category code','53':'Currency (050 = BDT)','54':'Transaction amount','58':'Country code','59':'Merchant name','60':'Merchant city','62':'Additional data','63':'CRC'};
+function inspectQR(raw){const s=raw.trim();const res={ok:true,rows:[],checks:[]};
+ try{if(!s)throw new Error('Paste a QR payload first.');const top=parseTLV(s);
+  top.forEach(t=>{const nm=(+t.id>=26&&+t.id<=51)?'Merchant account information':TAGN[t.id]||'Tag '+t.id;let val=t.val;
+   if(t.id==='01')val+=t.val==='11'?' · static':t.val==='12'?' · dynamic':'';
+   res.rows.push({id:t.id,name:nm,len:t.len,val,lvl:0});
+   if((+t.id>=26&&+t.id<=51)||t.id==='62'){safe(()=>parseTLV(t.val).forEach(n=>res.rows.push({id:t.id+'.'+n.id,name:t.id==='62'?({'05':'Reference label','01':'Bill number'}[n.id]||'Sub-tag '+n.id):({'00':'Globally unique id','01':'Account / merchant id','02':'Terminal id'}[n.id]||'Sub-tag '+n.id),len:n.len,val:n.val,lvl:1})),0)}});
+  const last=top[top.length-1];const crcOk=last&&last.id==='63'&&last.len===4&&crc16(s.slice(0,-4))===last.val.toUpperCase();
+  res.checks.push([top[0]&&top[0].id==='00','Starts with payload format indicator (00)']);
+  res.checks.push([!!last&&last.id==='63','Ends with CRC tag (63)']);
+  res.checks.push([crcOk,'CRC-16/CCITT matches'+(last&&last.id==='63'&&!crcOk?` (expected ${crc16(s.slice(0,-4))}, found ${last.val})`:'')]);
+  res.checks.push([top.some(t=>t.id==='53'&&t.val==='050'),'Currency is BDT (050)']);
+  res.checks.push([top.some(t=>t.id==='58'&&t.val==='BD'),'Country is BD']);
+ }catch(e){res.ok=false;res.err=e.message}return res}
+function pgInspector(){
+ const o=ui().qrOut;
+ return pageHead('QR inspector','Decode a Bangla QR payload (EMV TLV) and check its structure and CRC. Everything runs in your browser; nothing is sent to the server.')+
+ `<div class="grid g-main"><section class="card"><div class="ch"><h3>Payload</h3><span class="grow"></span><button class="btn sm" data-act="qrSample" data-k="static">Static sample</button><button class="btn sm" data-act="qrSample" data-k="dynamic">Dynamic sample</button></div><div class="pad"><div class="f"><label for="qrText">QR payload string</label><textarea id="qrText" class="mono" data-in="qrText" rows="7" placeholder="000201010211…6304ABCD" style="min-height:150px">${esc(ui().qrText)}</textarea></div><div class="acts"><button class="btn pri" data-act="qrInspect">${ic('search')} Inspect</button><button class="btn" data-act="qrClear">Clear</button></div></div></section>
+ <section class="card"><div class="ch"><h3>Checks</h3></div><div class="list">${o?(o.ok?o.checks.map(c=>`<div class="row"><span class="ico ${c[0]?'ok':'bad'}">${ic(c[0]?'check':'x')}</span><span>${esc(c[1])}</span></div>`).join(''):`<div class="row"><span class="ico bad">${ic('x')}</span><span>${esc(o.err)}</span></div>`):`<div class="empty"><b>No payload inspected</b>Load a sample or paste your own.</div>`}</div></section></div>`+
+ (o&&o.ok?`<section class="card" style="margin-top:16px"><div class="ch"><h3>Decoded fields</h3></div><div class="tw"><table><thead><tr><th>Tag</th><th>Field</th><th class="r">Length</th><th>Value</th></tr></thead><tbody>${o.rows.map(r=>`<tr><td class="mono">${r.id}</td><td style="padding-left:${20+r.lvl*24}px">${r.lvl?'<span class="muted">↳ </span>':''}${esc(r.name)}</td><td class="r num">${r.len}</td><td class="mono">${esc(r.val)}</td></tr>`).join('')}</tbody></table></div></section>`:'')}
+
+/* ================= FI pages ================= */
+const FI='i1';
+function fiOct(){return D.octCounts.i1}
+function pgFiOverview(){
+ const u=S.user,oc=fiOct(),rc=rateFor(FI,'2026-10'),est=r2((oc.sg+oc.dg)*rc.gen+oc.v*rc.val);
+ const chart=barChart(PERIODS.map(p=>{const c=D.counts[FI][p];return {label:monShort(p),a:c.sg+c.dg,b:c.v,draft:p==='2026-09'}}),{aria:'Your monthly calls'});
+ const ls=stmt(FI,'2026-08');const recent=D.events.slice(0,6);
+ return `<div class="hero"><div><h2>Welcome back, ${esc(u.name.split(' ')[0])}</h2><p data-pretext>Here is how ${esc(u.title)} is using Secure Bangla QR this month. Your August statement is final and available to download.</p></div><a class="btn pri" href="#/fi/statements">View statements ${ic('chev')}</a></div>
+ <div class="grid g4 mb">
+  <div class="card kpi"><small><span class="ico">${ic('qr')}</span>Generations · Oct</small><div class="v num">${fmt(oc.sg+oc.dg)}</div><div class="s">Static ${fmt(oc.sg)} · Dynamic ${fmt(oc.dg)}</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('shield')}</span>Validations · Oct</small><div class="v num">${fmt(oc.v)}</div><div class="s">Month to date, 1–2 Oct</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('card')}</span>Estimated charge · Oct</small><div class="v num">${bdt(est)}</div><div class="s">At ${bdt(rc.gen)} / generation, ${bdt(rc.val)} / validation</div></div>
+  <div class="card kpi"><small><span class="ico">${ic('doc')}</span>Last statement</small><div class="v num">${bdt(ls.total)}</div><div class="s">August 2026 · Finalized</div></div>
+ </div>
+ <div class="grid g-main mb">
+  <section class="card"><div class="ch"><h3>Your calls by month</h3><span class="grow"></span><div class="legend"><span><i style="background:var(--c2)"></i>Generations</span><span><i style="background:var(--c1)"></i>Validations</span></div></div><div class="pad">${chart}</div><div class="note">September is shown lighter: the statement is still a draft.</div></section>
+  <section class="card"><div class="ch"><h3>Notices</h3></div><div class="list">
+   <a class="row" href="#/fi/apps"><span class="ico warn">${ic('clock')}</span><div class="grow"><b style="display:block">Certificate expires in 38 days</b><span class="muted" style="font-size:12.5px">Renew before 9 Nov 2026 to avoid interruption</span></div>${ic('chev')}</a>
+   <a class="row" href="#/fi/statements"><span class="ico ok">${ic('check')}</span><div class="grow"><b style="display:block">August statement finalized</b><span class="muted" style="font-size:12.5px">${bdt(ls.total)} · ready to download</span></div>${ic('chev')}</a>
+   <a class="row" href="#/fi/statements"><span class="ico info">${ic('info')}</span><div class="grow"><b style="display:block">September statement in draft</b><span class="muted" style="font-size:12.5px">Final after RVL closes the month</span></div>${ic('chev')}</a>
+  </div></section>
+ </div>
+ <section class="card"><div class="ch"><h3>Recent activity</h3><span class="grow"></span><a class="btn sm" href="#/fi/usage">All usage</a></div>${usageTable(recent)}</section>`}
+function usageTable(rows){return `<div class="tw"><table><thead><tr><th>Time</th><th>Meter</th><th>Client reference</th><th>Result</th><th>Billable</th><th>Event</th></tr></thead><tbody>${rows.length?rows.map(e=>`<tr><td class="num nowrap">${e.at}</td><td>${meterLabel(e.meter)}</td><td class="mono">${esc(e.ref)}</td><td>${chip(e.verdict,e.verdict[0]+e.verdict.slice(1).toLowerCase())}</td><td>${e.billable?'<span class="pos"><b>Yes</b></span>':'<span class="muted">No</span>'}</td><td class="mono muted">${e.id}</td></tr>`).join(''):emptyRow(6,'No events match','Adjust the filters or date range.')}</tbody></table></div>`}
+function filteredEvents(){const u=ui(),q=u.usageQ.trim().toLowerCase();return D.events.filter(e=>(u.usageMeter==='all'||e.meter===u.usageMeter)&&(u.usageResult==='all'||(u.usageResult==='billable'?e.billable:!e.billable))&&(!u.usageFrom||e.at.slice(0,10)>=u.usageFrom)&&(!u.usageTo||e.at.slice(0,10)<=u.usageTo)&&(!q||(e.ref+e.id).toLowerCase().includes(q)))}
+function pgFiUsage(){
+ const list=filteredEvents(),per=12,pg=Math.min(ui().usagePage,Math.max(1,Math.ceil(list.length/per)));const slice=list.slice((pg-1)*per,pg*per);const u=ui();
+ return pageHead('Usage','Every QR generation and validation made with your credentials. Validations are billed only when the verdict is conclusive (valid or invalid).',`<button class="btn" data-act="csvFiUsage">${ic('dl')} Export CSV</button>`)+
+ `<section class="card"><div class="tools"><label class="fld" style="flex:1;min-width:200px">${ic('search')}<input id="usageQ" data-in="usageQ" value="${esc(u.usageQ)}" placeholder="Client reference or event id" aria-label="Search usage" style="flex:1"></label>
+ <label class="fld"><select data-in="usageMeter" aria-label="Meter"><option value="all">All meters</option>${['GENERATION_STATIC','GENERATION_DYNAMIC','VALIDATION'].map(m=>`<option value="${m}" ${u.usageMeter===m?'selected':''}>${meterLabel(m)}</option>`).join('')}</select></label>
+ <label class="fld"><select data-in="usageResult" aria-label="Billing"><option value="all">Billable & not</option><option value="billable" ${u.usageResult==='billable'?'selected':''}>Billable only</option><option value="free" ${u.usageResult==='free'?'selected':''}>Not billable</option></select></label>
+ <label class="fld"><span style="font-size:12px">From</span><input type="date" data-in="usageFrom" value="${u.usageFrom}" min="2026-09-01" max="${TODAY}" aria-label="From date"></label>
+ <label class="fld"><span style="font-size:12px">To</span><input type="date" data-in="usageTo" value="${u.usageTo}" min="2026-09-01" max="${TODAY}" aria-label="To date"></label>
+ ${(u.usageQ||u.usageMeter!=='all'||u.usageResult!=='all'||u.usageFrom||u.usageTo)?'<button class="btn sm ghost" data-act="usageReset">Reset</button>':''}</div>
+ ${usageTable(slice)}${pager(list.length,pg,per,'usagePage')}<div class="note">Latest ${D.events.length} events shown. The full ledger for any month is in the statement's usage.csv.</div></section>`}
+
+function stmtDetailHTML(s,fiView){
+ const meta=D.periodMeta[s.period],fin=meta.status==='Finalized';
+ return `<div class="banner ${fin?'ok':'warn'}" style="margin-bottom:18px">${ic(fin?'check':'clock')}<div><b>${fin?'Finalized':'Draft'} · ${monthName(s.period)}</b><div>${fin?`Locked on ${meta.at} by ${esc(meta.by)}.`:'Figures may still change until RVL finalizes the month.'}</div></div></div>
+ <table style="margin-bottom:14px"><thead><tr><th style="padding-left:0">Line</th><th class="r">Quantity</th><th class="r">Rate</th><th class="r" style="padding-right:0">Amount</th></tr></thead><tbody>
+ <tr><td style="padding-left:0">Static generation</td><td class="r num">${fmt(s.sg)}</td><td class="r num">${bdt(s.gen)}</td><td class="r num" style="padding-right:0">${bdt(r2(s.sg*s.gen))}</td></tr>
+ <tr><td style="padding-left:0">Dynamic generation</td><td class="r num">${fmt(s.dg)}</td><td class="r num">${bdt(s.gen)}</td><td class="r num" style="padding-right:0">${bdt(r2(s.dg*s.gen))}</td></tr>
+ <tr><td style="padding-left:0">Validation (conclusive)</td><td class="r num">${fmt(s.v)}</td><td class="r num">${bdt(s.val)}</td><td class="r num" style="padding-right:0">${bdt(s.va)}</td></tr>
+ ${s.adjs.map(a=>`<tr><td style="padding-left:0">Adjustment<br><small class="muted">${esc(a.reason)}</small></td><td class="r num">1</td><td class="r num">—</td><td class="r num ${a.amount<0?'neg':'pos'}" style="padding-right:0">${bdtS(a.amount)}</td></tr>`).join('')}
+ </tbody><tfoot><tr><td colspan="3" style="padding-left:0">Total</td><td class="r num" style="padding-right:0">${bdt(s.total)}</td></tr></tfoot></table>
+ <p class="muted" style="font-size:12.5px;margin:0">Rate card effective ${s.cardFrom}. This statement is a billing record, not a tax invoice.</p>`}
+function pgFiStatements(){
+ const rows=PERIODS.slice().reverse().map(p=>stmt(FI,p)).filter(Boolean);
+ return pageHead('Statements','Monthly billing statements for your institution. Finalized statements are locked and will not change.')+
+ `<section class="card"><div class="tw"><table><thead><tr><th>Period</th><th class="r">Generations</th><th class="r">Validations</th><th class="r">Adjustments</th><th class="r">Total</th><th>Status</th><th></th></tr></thead><tbody>
+ ${rows.map(s=>`<tr class="click" data-act="stmtDrawer" data-i="${FI}" data-p="${s.period}"><td><b>${monthName(s.period)}</b></td><td class="r num">${fmt(s.sg+s.dg)}</td><td class="r num">${fmt(s.v)}</td><td class="r num ${s.adj<0?'neg':s.adj>0?'pos':''}">${s.adj?bdtS(s.adj):'—'}</td><td class="r num"><b>${bdt(s.total)}</b></td><td>${chip(D.periodMeta[s.period].status)}</td><td class="r muted">${ic('chev')}</td></tr>`).join('')}
+ </tbody></table></div><div class="note">Statements are not tax invoices. Your invoice is issued by RVL Finance after the month closes.</div></section>`}
+function pgFiApps(){
+ const apps=D.apps.filter(a=>a.inst===FI),c=D.certs[FI];
+ return pageHead('Applications & certificate','Read-only view of what RVL has provisioned for your institution. Contact RVL support to change credentials or renew your certificate.')+
+ (c.expires<'2026-12-01'?`<div class="banner warn">${ic('clock')}<div><b>Certificate expires on ${c.expires}</b><div>That is 38 days away. Send RVL your renewed certificate to keep API access uninterrupted. <a data-act="renewReq">Request renewal</a></div></div></div>`:'')+
+ `<div class="grid g2"><section class="card"><div class="ch"><h3>Applications</h3></div><div class="tw"><table><thead><tr><th>Application</th><th>Created</th><th>Status</th></tr></thead><tbody>${apps.map(a=>`<tr><td><b>${esc(a.name)}</b></td><td class="num">${a.created}</td><td>${chip(a.status)}</td></tr>`).join('')}</tbody></table></div></section>
+ <section class="card"><div class="ch"><h3>mTLS certificate</h3></div><div class="pad"><dl class="kv"><dt>Subject</dt><dd class="mono">${esc(c.subject)}</dd><dt>Issuer</dt><dd>${c.issuer}</dd><dt>Expires</dt><dd>${c.expires}</dd><dt>Thumbprint</dt><dd class="mono">${c.thumb}</dd><dt>Client ID</dt><dd class="mono">shb-prod-i1</dd></dl></div></section></div>`}
+function pgFiAccount(){
+ const u=S.user,t=ui().accTab;const tabs=[['profile','Profile'],['security','Password'],['notify','Notifications']];
+ let body='';
+ if(t==='profile')body=`<section class="card" style="max-width:640px"><div class="ch"><h3>Profile</h3></div><div class="pad"><div style="display:flex;gap:14px;align-items:center;margin-bottom:20px"><div class="avatar" style="width:52px;height:52px;font-size:17px">${initials(u.name)}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="muted">${esc(u.title)}</div></div></div><dl class="kv"><dt>User ID</dt><dd>${esc(u.id)}</dd><dt>Institution</dt><dd>${esc(u.title)}</dd><dt>Role</dt><dd>${u.role==='fi'?'Institution user':esc(u.title)}</dd><dt>Last sign-in</dt><dd>${NOW} · Dhaka, BD</dd></dl></div></section>`;
+ if(t==='security')body=`<section class="card" style="max-width:520px"><div class="ch"><h3>Change password</h3></div><div class="pad"><div class="f"><label for="pw0">Current password</label><input id="pw0" type="password" autocomplete="current-password"><div class="e"></div></div><div class="f"><label for="pw1">New password</label><input id="pw1" type="password" autocomplete="new-password"><div class="e"></div><div class="h">At least 10 characters, with a number and a symbol.</div></div><div class="f"><label for="pw2">Confirm new password</label><input id="pw2" type="password" autocomplete="new-password"><div class="e"></div></div><button class="btn pri" data-act="changePw">Update password</button></div></section>`;
+ if(t==='notify'){const n=S.notify||(S.notify={stmt:true,cert:true,usage:false});body=`<section class="card" style="max-width:640px"><div class="ch"><h3>Email notifications</h3></div><div class="list">${[['stmt','Statement finalized','Email when a monthly statement is ready'],['cert','Certificate expiry','Reminders 60, 30 and 7 days before expiry'],['usage','Usage anomalies','Alert when daily volume is far above your normal']].map(x=>`<div class="row" style="align-items:center"><div class="grow"><b style="display:block">${x[1]}</b><span class="muted" style="font-size:12.5px">${x[2]}</span></div><button class="sw" role="switch" aria-checked="${!!n[x[0]]}" aria-label="${x[1]}" data-act="notif" data-k="${x[0]}"></button></div>`).join('')}</div></section>`}
+ return pageHead('Account','')+`<div class="tabs" role="tablist">${tabs.map(x=>`<button role="tab" class="${t===x[0]?'on':''}" data-act="accTab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`+body}
+
+/* ================= login ================= */
+function pgLogin(){
+ const fi=S.tab==='fi';document.documentElement.dataset.surface=fi?'fi':'staff';
+ if(S.forgot)return loginShell(`<h1>Reset password</h1><p>Enter your user ID. If an account exists, we email a reset link that expires in 30 minutes.</p>${S.sent?`<div class="banner ok">${ic('check')}<div><b>Check your inbox</b><div>If <b>${esc(S.sent)}</b> matches an account, a reset link is on its way.</div></div></div>`:''}<div class="f"><label for="fu">User ID</label><input id="fu" autocomplete="username" placeholder="you@organisation.example"><div class="e">Enter your user ID.</div></div><div class="acts"><button class="btn pri" data-act="sendReset" style="flex:1">Send reset link</button><button class="btn" data-act="backLogin">Back to sign in</button></div>`);
+ return loginShell(`<h1>Sign in</h1><p>${fi?'Institution portal for Secure Bangla QR.':'RVL staff console for operations and finance.'}</p>
+ <div class="seg" role="tablist"><button role="tab" class="${fi?'on':''}" data-act="loginTab" data-t="fi">Institution</button><button role="tab" class="${!fi?'on':''}" data-act="loginTab" data-t="staff">RVL Staff</button></div>
+ ${S.loginErr?`<div class="banner bad" role="alert">${ic('warn')}<div><b>${esc(S.loginErr)}</b></div></div>`:''}
+ <form id="loginForm" novalidate><div class="f"><label for="lu">User ID</label><input id="lu" autocomplete="username" value="${esc(S.lu||'')}" placeholder="${fi?'you@yourbank.example':'you@rvl.example'}"><div class="e">Enter your user ID.</div></div>
+ <div class="f"><label for="lp">Password</label><div class="pw"><input id="lp" type="password" autocomplete="current-password" value="${esc(S.lp||'')}"><button type="button" data-act="showPw" aria-label="Show password">${ic('eye')}</button></div><div class="e">Enter your password.</div></div>
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><label class="chk"><input type="checkbox"> Remember me</label><a class="link" data-act="forgot" href="#" style="font-size:13px">Forgot password?</a></div>
+ <button class="btn pri" style="width:100%;height:44px" type="submit">Sign in</button></form>
+ <div class="demo"><small>Prototype demo accounts (password <b>Demo@1234</b>)</small><div class="acts">${D.accounts.filter(a=>fi?a.surface==='fi':a.surface==='staff').map(a=>`<button data-act="fillDemo" data-id="${a.id}">${esc(a.title)} · ${esc(a.name.split(' ')[0])}</button>`).join('')}</div></div>`)}
+function loginShell(inner){const fi=S.tab==='fi';return `<div class="login"><section class="l-art"><div class="brand"><div class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.6" fill="#0b5ea8"/><rect x="13" y="3" width="8" height="8" rx="1.6" fill="#17a05f"/><rect x="3" y="13" width="8" height="8" rx="1.6" fill="#17a05f"/><rect x="5.4" y="5.4" width="3.2" height="3.2" rx=".6" fill="#fff"/><rect x="15.4" y="5.4" width="3.2" height="3.2" rx=".6" fill="#fff"/><rect x="5.4" y="15.4" width="3.2" height="3.2" rx=".6" fill="#fff"/><rect x="13" y="13" width="3.6" height="3.6" rx=".8" fill="#0b5ea8"/><rect x="17.4" y="17.4" width="3.6" height="3.6" rx=".8" fill="#0b5ea8"/></svg></div><div><b>Secure Bangla QR</b><span>${fi?'Institution Portal':'Staff Console'}</span></div></div><div><h2>${fi?'Your QR usage, statements and credentials in one place.':'Run QR operations and billing with confidence.'}</h2><p>${fi?'Review every generation and validation, download monthly statements and keep your certificate current.':'Onboard institutions, manage keys, set rate cards and close each billing month with a full audit trail.'}</p><div class="pts"><div>${ic('shield')} mTLS and signed-key custody</div><div>${ic('lock')} Locked, auditable billing periods</div><div>${ic('chart')} Metered to the single call</div></div></div><small style="color:var(--side-head)">© 2026 Relief Validation Limited · Bangladesh Bank BQR</small></section><section class="l-form"><div class="l-card">${inner}</div></section></div>`}
+
+/* ================= shell ================= */
+const initials=n=>n.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+function notifs(){
+ if(S.user.surface==='fi')return [['warn','clock','Certificate expires in 38 days','Renew before 9 Nov 2026','#/fi/apps'],['ok','check','August statement finalized',bdt(stmt(FI,'2026-08').total),'#/fi/statements']];
+ const out=[];if(D.late.some(l=>l.status==='Queued'))out.push(['warn','warn',D.late.filter(l=>l.status==='Queued').length+' usage events queued','Blocks finalizing 2026-09','#/staff/reports']);
+ if(D.adj.some(a=>a.status==='Pending'))out.push(['info','info',D.adj.filter(a=>a.status==='Pending').length+' pending adjustments','For 2026-09','#/staff/adjustments']);
+ out.push(['warn','clock','Shapla Bank certificate expiring','38 days left','#/staff/institution/i1']);return out}
+function titleFor(page,arg){const n=navFor(S.user).find(x=>x[0]===page);if(page==='institution')return ['Institutions',inst(arg)?.name||''];return [n?n[1]:'',''] }
+function shell(page,arg,content){
+ const u=S.user,fi=u.surface==='fi',nav=navFor(u);const tt=titleFor(page,arg);const issues=openIssues();
+ document.documentElement.dataset.surface=fi?'fi':'staff';
+ return `<div class="app"><aside class="side ${S.menu?'open':''}" id="side" aria-label="Primary"><div class="brand"><div class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.6" fill="#0b5ea8"/><rect x="13" y="3" width="8" height="8" rx="1.6" fill="#17a05f"/><rect x="3" y="13" width="8" height="8" rx="1.6" fill="#17a05f"/><rect x="5.4" y="5.4" width="3.2" height="3.2" rx=".6" fill="#fff"/><rect x="15.4" y="5.4" width="3.2" height="3.2" rx=".6" fill="#fff"/><rect x="5.4" y="15.4" width="3.2" height="3.2" rx=".6" fill="#fff"/><rect x="13" y="13" width="3.6" height="3.6" rx=".8" fill="#0b5ea8"/><rect x="17.4" y="17.4" width="3.6" height="3.6" rx=".8" fill="#0b5ea8"/></svg></div><div><b>Secure Bangla QR</b><span>${fi?esc(u.title):'Staff Console'}</span></div></div><nav class="nav" aria-label="Main">
+ ${nav.map(n=>n[0]==='_h'?`<div class="nav-h">${n[1]}</div>`:`<a href="#/${u.surface}/${n[0]}" class="${page===n[0]||(page==='institution'&&n[0]==='institutions')?'on':''}" ${page===n[0]?'aria-current="page"':''}>${ic(n[2])}${n[1]}${n[0]==='reports'&&D.late.some(l=>l.status==='Queued')?`<span class="badge">${D.late.filter(l=>l.status==='Queued').length}</span>`:''}</a>`).join('')}
+ </nav><div class="side-foot nav"><a href="#" data-act="logout">${ic('out')}Log out</a></div></aside>
+ <div style="min-width:0"><header class="top"><button class="ib menu-btn" data-act="menu" aria-label="Open menu">${ic('menu')}</button><div><div class="crumb">${fi?'Institution Portal':'Staff Console'}</div><h1>${esc(tt[0])}</h1></div><span class="grow"></span>
+ <label class="search">${ic('search')}<span class="sr">Search</span><input id="gsearch" placeholder="${fi?'Search usage by reference':'Search institutions'}" data-act="gsearch"></label>
+ <button class="ib" data-act="theme" aria-label="Toggle theme" title="Theme: ${S.theme||'auto'}">${ic('sun')}</button>
+ <div class="rel"><button class="ib" data-act="bell" aria-label="Notifications" aria-haspopup="true">${ic('bell')}${(fi?2:issues)?'<span class="dot"></span>':''}</button></div>
+ <div class="rel"><button class="userbtn" data-act="userMenu" aria-haspopup="true"><span class="avatar">${initials(u.name)}</span><div><strong>${esc(u.name)}</strong><small>${esc(u.title)}</small></div></button></div></header>
+ <main class="content" id="main">${content}</main></div></div>`}
+
+/* ================= render ================= */
+function render(){
+ const {surf,page,arg}=parse();
+ if(!S.user){const f=document.activeElement;const id=f&&f.id;$('#app').innerHTML=pgLogin();document.title='Sign in · Secure Bangla QR';if(id&&$('#'+id))$('#'+id).focus();bindLogin();return}
+ if(surf!==S.user.surface||!page||!allowed(S.user,page)){history.replaceState(null,'',home());return render()}
+ const fn=({overview:()=>S.user.surface==='fi'?pgFiOverview():pgStaffOverview(),institutions:pgInstitutions,institution:()=>pgInstitution(arg),rates:pgRates,periods:pgPeriods,adjustments:pgAdjustments,reports:pgReports,keys:pgKeys,inspector:pgInspector,usage:pgFiUsage,statements:pgFiStatements,apps:pgFiApps,account:pgFiAccount})[page];
+ const act=document.activeElement,aid=act&&act.id,sel=act&&act.selectionStart!=null?[act.selectionStart,act.selectionEnd]:null;const sy=window.scrollY;
+ $('#app').innerHTML=shell(page,arg,fn());document.title=titleFor(page,arg)[0]+' · Secure Bangla QR';
+ if(aid&&$('#'+aid)){const el=$('#'+aid);el.focus();if(sel&&el.setSelectionRange)safe(()=>el.setSelectionRange(sel[0],sel[1]))}
+ window.scrollTo(0,sy);pretext();}
+function pretext(){safe(()=>{const P=window.Pretext;if(!P)return;document.fonts.ready.then(()=>$$('[data-pretext]').forEach(el=>{const cs=getComputedStyle(el),h=P.prepare(el.textContent,cs.font),w=el.clientWidth;if(w)el.style.minHeight=P.layout(h,w,parseFloat(cs.lineHeight)||20).height+'px'}))})}
+window.addEventListener('resize',pretext);
+
+/* ================= events ================= */
+function bindLogin(){const f=$('#loginForm');if(f)f.onsubmit=e=>{e.preventDefault();doLogin()}}
+function doLogin(){
+ const u=$('#lu').value.trim(),p=$('#lp').value;S.lu=u;S.lp='';fieldErr('lu',u?'':'Enter your user ID.');fieldErr('lp',p?'':'Enter your password.');if(!u||!p)return;
+ const a=D.accounts.find(x=>x.id.toLowerCase()===u.toLowerCase()&&x.pw===p&&x.surface===(S.tab==='fi'?'fi':'staff'));
+ if(!a){S.loginErr='Invalid user ID or password.';render();return}
+ S.user=a;S.loginErr='';S.lu='';S.lp='';resetUi();go(home());render();toast('Signed in as '+a.name)}
+const A={
+ close:()=>closeOverlay(),
+ goto:el=>go(el.dataset.h),
+ menu:()=>{S.menu=!S.menu;$('#side').classList.toggle('open',S.menu)},
+ logout:()=>{S.user=null;S.menu=false;history.replaceState(null,'',location.pathname);render()},
+ theme:()=>{const m=['auto','light','dark'];S.theme=m[(m.indexOf(S.theme||'auto')+1)%3];const r=document.documentElement;S.theme==='auto'?r.removeAttribute('data-theme'):r.dataset.theme=S.theme;toast('Theme: '+S.theme);render()},
+ bell:el=>popup(el,`<div class="pop" role="menu"><div style="padding:12px 16px;border-bottom:1px solid var(--line);font-weight:650">Notifications</div>${notifs().map(n=>`<button class="it" data-act="goto" data-h="${n[4]}"><span class="ico ${n[0]}" style="width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none">${ic(n[1])}</span><span><b style="display:block">${n[2]}</b><span class="muted" style="font-size:12.5px">${n[3]}</span></span></button>`).join('')}</div>`),
+ userMenu:el=>popup(el,`<div class="pop" role="menu" style="min-width:230px"><div style="padding:12px 16px;border-bottom:1px solid var(--line)"><b>${esc(S.user.name)}</b><div class="muted" style="font-size:12.5px">${esc(S.user.id)}</div></div>${S.user.surface==='fi'?`<button class="menu" data-act="goto" data-h="#/fi/account">${ic('user')} Account</button>`:''}<button class="menu" data-act="theme">${ic('sun')} Theme: ${S.theme||'auto'}</button><button class="menu" data-act="logout">${ic('out')} Log out</button></div>`),
+ gsearch:()=>{},
+ /* login */
+ loginTab:el=>{S.tab=el.dataset.t;S.loginErr='';S.lu='';render()},
+ fillDemo:el=>{S.lu=el.dataset.id;S.lp='Demo@1234';render();$('#loginForm button[type=submit]').focus()},
+ showPw:()=>{const i=$('#lp');i.type=i.type==='password'?'text':'password'},
+ forgot:(el,e)=>{e.preventDefault();S.forgot=true;S.sent='';render()},
+ backLogin:()=>{S.forgot=false;S.sent='';render()},
+ sendReset:()=>{const v=$('#fu').value.trim();fieldErr('fu',v?'':'Enter your user ID.');if(!v)return;S.sent=v;render()},
+ /* institutions */
+ instTab:el=>{ui().instTab=el.dataset.t;render()},
+ setStatus:el=>{const i=inst(el.dataset.id),s=el.dataset.s;const word={Active:'Activate',Suspended:'Suspend',Terminated:'Terminate'}[s];
+  const txt={Suspended:'Suspending blocks all QR generation and validation for this institution until it is reactivated.',Terminated:'Termination is permanent. Credentials are revoked and the institution cannot be reactivated.',Active:i.status==='Pending'?'The institution will be able to call the API once a credential is provisioned.':'API access is restored immediately.'}[s];
+  openModal({title:`${i.status==='Suspended'&&s==='Active'?'Reactivate':word} ${i.name}?`,text:txt,ok:i.status==='Suspended'&&s==='Active'?'Reactivate':word,danger:s==='Terminated',onOk:()=>{i.status=s;D.apps.filter(a=>a.inst===i.id).forEach(a=>{if(s==='Terminated'||s==='Suspended'&&a.status==='Active')a.status='Suspended'});closeOverlay();render();toast(`${i.name} is now ${s.toLowerCase()}`)}})},
+ addApp:el=>{const id=el.dataset.id;openDrawer({title:'Add application',body:`<div class="f"><label for="an">Application name</label><input id="an" placeholder="e.g. Mobile Banking"><div class="e"></div></div><p class="muted">The application inherits the institution's certificate and scopes.</p>`,footer:`<button class="btn" data-act="close">Cancel</button><button class="btn pri" id="svApp">Add application</button>`,onOpen:()=>{$('#svApp').onclick=()=>{const v=$('#an').value.trim();if(v.length<3){fieldErr('an','Enter at least 3 characters.');return}D.apps.push({id:'a'+(D.apps.length+1),inst:id,name:v,status:'Active',created:TODAY});closeOverlay();render();toast('Application added')}}})},
+ toggleApp:el=>{const a=D.apps.find(x=>x.id===el.dataset.id);a.status=a.status==='Active'?'Suspended':'Active';render();toast(`${a.name} ${a.status==='Active'?'reinstated':'suspended'}`)},
+ replaceCert:el=>{const id=el.dataset.id;openDrawer({title:'Upload client certificate',body:`<div class="f"><label for="cf">Certificate (PEM)</label><textarea id="cf" class="mono" placeholder="-----BEGIN CERTIFICATE-----"></textarea><div class="e"></div><div class="h">Must be issued by RVL Issuing CA G2. Maximum 13 months validity.</div></div>`,footer:`<button class="btn" data-act="close">Cancel</button><button class="btn pri" id="svCert">Upload</button>`,onOpen:()=>{$('#svCert').onclick=()=>{const v=$('#cf').value.trim();if(!/BEGIN CERTIFICATE/.test(v)){fieldErr('cf','Paste a PEM certificate starting with BEGIN CERTIFICATE.');return}D.certs[id]={subject:'CN=api.'+inst(id).code.toLowerCase()+'.example',issuer:'RVL Issuing CA G2',expires:'2027-10-01',thumb:'B2:77:0A:EE:15:C3:98:4D:61:F0:2B:D7:83:5E:A9:06'};closeOverlay();render();toast('Certificate updated')}}})},
+ revokeCert:el=>{const id=el.dataset.id;openModal({title:'Revoke certificate?',text:'The institution loses API access immediately until a new certificate is uploaded.',ok:'Revoke',danger:true,onOk:()=>{delete D.certs[id];closeOverlay();render();toast('Certificate revoked')}})},
+ provision:el=>{const i=inst(el.dataset.id);const secret='rvl_sk_'+Array.from({length:32},()=>'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*32)]).join('');
+  openModal({title:'Credential provisioned',text:`Copy the secret for <b>${esc(i.name)}</b> now. It will not be shown again.`,html:`<div class="secret mono"><span class="grow" id="sec">${secret}</span><button class="btn sm" data-act="copySecret">${ic('copy')} Copy</button></div><div class="banner warn" style="margin:16px 0 20px">${ic('warn')}<div><div>Any previous secret for this client stops working immediately.</div></div></div>`,ok:'I have stored it',cancel:false,onOk:closeOverlay})},
+ copySecret:()=>{safe(()=>navigator.clipboard.writeText($('#sec').textContent));toast('Secret copied')},
+ addInst:()=>wizard(1),
+ wizNext:()=>{const need=[['wn','Enter the organisation name.'],['wc','Enter a contact name.'],['we','Enter a valid email.']];let ok=true;need.forEach(([id,m])=>{const v=$('#'+id).value.trim();const bad=!v||(id==='we'&&!/^\S+@\S+\.\S+$/.test(v));fieldErr(id,bad?m:'');if(bad)ok=false});if(!ok)return;S.wiz={name:$('#wn').value.trim(),contact:$('#wc').value.trim(),email:$('#we').value.trim(),type:$('#wt').value,phone:$('#wp').value.trim(),addr:$('#wa').value.trim()};wizard(2)},
+ wizBack:()=>wizard(1),
+ wizSubmit:()=>{const f=$('#wd');if(!f.dataset.file){fieldErr('wd','Attach at least one document.');return}const w=S.wiz;const id='i'+(D.inst.length+1);D.inst.push({id,name:w.name,code:w.name.split(/\s+/).map(x=>x[0]).join('').toUpperCase().slice(0,4),type:w.type,status:'Pending',onboarded:TODAY,contact:w.contact,email:w.email,phone:w.phone||'—',addr:w.addr||'—',base:0,from:null,to:null});closeOverlay();go('#/staff/institution/'+id);toast('Institution added')},
+ fakeFile:()=>{const f=$('#wd');f.dataset.file='1';f.innerHTML=`${ic('check')} <b>${esc($('#wdt').value)}.pdf</b> <span class="muted">· 1.2 MB</span>`;fieldErr('wd','')},
+ /* rates */
+ addRate:()=>openDrawer({title:'New rate card',body:`<div class="f"><label for="rn">Institution</label><select id="rn">${D.inst.filter(i=>i.status!=='Terminated').map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select><div class="e"></div></div><div class="f"><label for="rf">Effective from</label><input id="rf" type="date" value="2026-11-01"><div class="e"></div><div class="h">Use the first day of a month.</div></div><div class="row2"><div class="f"><label for="rg">Generation (৳ / call)</label><input id="rg" inputmode="decimal" value="0.45"><div class="e"></div></div><div class="f"><label for="rv">Validation (৳ / call)</label><input id="rv" inputmode="decimal" value="0.18"><div class="e"></div></div></div><div class="f"><label>Currency</label><input value="BDT" readonly></div>`,footer:`<button class="btn" data-act="close">Cancel</button><button class="btn pri" id="svRate">Create rate card</button>`,
+  onOpen:()=>{$('#svRate').onclick=()=>{const i=$('#rn').value,f=$('#rf').value,g=parseFloat($('#rg').value),v=parseFloat($('#rv').value);let ok=true;
+   const chk=(id,bad,m)=>{fieldErr(id,bad?m:'');if(bad)ok=false};
+   chk('rf',!f||f.slice(8)!=='01','Pick the first day of a month.');chk('rf',ok&&D.cards.some(c=>c.inst===i&&c.from===f),'This institution already has a card for that date.');
+   chk('rg',!(g>0),'Enter a rate above 0.');chk('rv',!(v>0),'Enter a rate above 0.');
+   if(f&&f.slice(0,7)<=PERIODS[PERIODS.length-1]&&D.periodMeta[f.slice(0,7)]&&D.periodMeta[f.slice(0,7)].status==='Finalized'){chk('rf',true,'That month is finalized and cannot be repriced.')}
+   if(!ok)return;D.cards.push({id:'r'+(D.cards.length+1),inst:i,from:f,gen:g,val:v});closeOverlay();render();toast('Rate card created')}}}),
+ delRate:el=>{const c=D.cards.find(x=>x.id===el.dataset.id);openModal({title:'Delete scheduled rate card?',text:`${esc(inst(c.inst).name)} · from ${c.from}. The previous card stays in effect.`,ok:'Delete',danger:true,onOk:()=>{D.cards=D.cards.filter(x=>x!==c);closeOverlay();render();toast('Rate card deleted')}})},
+ /* periods */
+ recalc:()=>{D.periodMeta[ui().period].calc=NOW;toast('Draft recalculated at '+NOW.slice(11))},
+ finalize:()=>{const p=ui().period,T=periodTotals(p);
+  openDrawer({title:'Finalize '+monthName(p),body:`<div class="banner warn" style="margin-bottom:20px">${ic('lock')}<div><b>This cannot be undone</b><div>The month is locked and the statements become the billing record.</div></div></div><div id="finErr"></div><dl class="kv" style="grid-template-columns:1fr auto;margin-bottom:22px"><dt>Subtotal</dt><dd class="num r">${bdt(T.sub)}</dd><dt>Adjustments (net)</dt><dd class="num r ${T.adj<0?'neg':''}">${T.adj?bdtS(T.adj):'৳ 0'}</dd><dt style="font-weight:700;color:var(--text)">Total to finalize</dt><dd class="num r" style="font-weight:700">${bdt(T.total)}</dd></dl><div class="f"><label for="fx">Confirm expected total (৳)</label><input id="fx" class="num" inputmode="decimal" autocomplete="off" placeholder="${T.total}"><div class="e">Does not match the period total.</div><div class="h">Type the total above. If usage changes before you confirm, finalize is rejected.</div></div><div class="f"><label>Finalized by</label><input value="${esc(S.user.id)}" readonly><div class="h">Taken from your signed-in account.</div></div>`,
+  footer:`<button class="btn" data-act="close">Cancel</button><button class="btn pri" id="finGo" disabled>Finalize period</button>`,
+  onOpen:()=>{const inp=$('#fx'),go=$('#finGo');inp.oninput=()=>{const ok=parseFloat(inp.value.replace(/,/g,''))===T.total;go.disabled=!ok;fieldErr('fx',inp.value&&!ok?'Does not match the period total.':'')};
+   go.onclick=()=>{const q=D.late.filter(l=>l.status==='Queued').length;if(q){$('#finErr').innerHTML=`<div class="banner bad" role="alert">${ic('warn')}<div><b>409 · USAGE_NOT_COMPLETE</b><div>${q} usage events have not been delivered. Requeue them in <a data-act="goto" data-h="#/staff/reports">Reports</a>, then try again.</div></div></div>`;return}
+    D.periodMeta[p]={status:'Finalized',by:S.user.id,at:NOW};D.adj.filter(a=>a.period===p).forEach(a=>a.status='Applied');closeOverlay();render();toast(monthName(p)+' finalized')}}})},
+ csvStatements:()=>{const p=ui().period,T=periodTotals(p);download(`statements-${p}.csv`,csv([['period','institution','static_generations','dynamic_generations','validations','subtotal','adjustments','total','currency'],...T.s.map(s=>[p,inst(s.inst).name,s.sg,s.dg,s.v,s.sub,s.adj,s.total,'BDT'])]));toast('statements.csv downloaded')},
+ csvUsage:()=>{const p=ui().period;download(`usage-${p}.csv`,csv([['period','institution','meter','billable_count'],...periodStmts(p).flatMap(s=>[[p,inst(s.inst).name,'GENERATION_STATIC',s.sg],[p,inst(s.inst).name,'GENERATION_DYNAMIC',s.dg],[p,inst(s.inst).name,'VALIDATION',s.v]])]));toast('usage.csv downloaded')},
+ stmtDrawer:el=>{const s=stmt(el.dataset.i,el.dataset.p);openDrawer({title:`${inst(s.inst).name} · ${monthName(s.period)}`,wide:true,body:stmtDetailHTML(s),footer:`<button class="btn" data-act="close">Close</button><button class="btn pri" data-act="csvOne" data-i="${s.inst}" data-p="${s.period}">${ic('dl')} Download CSV</button>`})},
+ csvOne:el=>{const s=stmt(el.dataset.i,el.dataset.p);download(`statement-${s.inst}-${s.period}.csv`,csv([['line','quantity','rate','amount'],['Static generation',s.sg,s.gen,r2(s.sg*s.gen)],['Dynamic generation',s.dg,s.gen,r2(s.dg*s.gen)],['Validation',s.v,s.val,s.va],...s.adjs.map(a=>['Adjustment: '+a.reason,1,'',a.amount]),['TOTAL','','',s.total]]));toast('Statement downloaded')},
+ /* adjustments */
+ addAdj:()=>openDrawer({title:'Record adjustment',body:`<div class="f"><label for="ai">Institution</label><select id="ai">${D.inst.filter(i=>D.counts[i.id]&&Object.keys(D.counts[i.id]).length).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select><div class="e"></div></div><div class="f"><label for="ap">Period</label><select id="ap">${PERIODS.slice().reverse().map(p=>`<option value="${p}">${p} · ${D.periodMeta[p].status}</option>`).join('')}</select><div class="e"></div><div class="h">Only draft periods accept adjustments.</div></div><div class="f"><label for="aa">Amount (৳)</label><input id="aa" inputmode="decimal" placeholder="-500 for a credit, 250 for a charge"><div class="e"></div></div><div class="f"><label for="ar">Reason</label><textarea id="ar" placeholder="What is this for? Include a ticket reference."></textarea><div class="e"></div></div>`,footer:`<button class="btn" data-act="close">Cancel</button><button class="btn pri" id="svAdj">Record adjustment</button>`,
+  onOpen:()=>{$('#svAdj').onclick=()=>{const amt=parseFloat($('#aa').value),reason=$('#ar').value.trim(),p=$('#ap').value;let ok=true;const chk=(id,bad,m)=>{fieldErr(id,bad?m:'');if(bad)ok=false};
+   chk('ap',D.periodMeta[p].status==='Finalized','That period is finalized. Record the adjustment against the open period instead.');chk('aa',!amt||isNaN(amt),'Enter a non-zero amount.');chk('ar',reason.length<8,'Give a reason of at least 8 characters.');
+   if(!ok)return;D.adj.push({id:'ad'+(D.adj.length+1),inst:$('#ai').value,period:p,amount:amt,reason,status:'Pending',by:S.user.id,at:NOW});closeOverlay();render();toast('Adjustment recorded')}}}),
+ delAdj:el=>{const a=D.adj.find(x=>x.id===el.dataset.id);openModal({title:'Remove pending adjustment?',text:`${bdtS(a.amount)} for ${esc(inst(a.inst).name)}, ${a.period}.`,ok:'Remove',danger:true,onOk:()=>{D.adj=D.adj.filter(x=>x!==a);closeOverlay();render();toast('Adjustment removed')}})},
+ /* reports */
+ repTab:el=>{ui().repTab=el.dataset.t;render()},
+ requeue:el=>{const l=D.late.find(x=>x.id===el.dataset.id);l.status='Delivered';D.counts[l.inst]['2026-09'].dg+=l.meter==='GENERATION_DYNAMIC'?1:0;render();toast(l.id+' delivered')},
+ requeueAll:()=>{D.late.forEach(l=>l.status='Delivered');render();toast('All queued events delivered')},
+ /* keys */
+ rotateKey:el=>{const k=D.keys.find(x=>x.id===el.dataset.id);openModal({title:'Rotate signing key?',text:`A new ES256 key is generated for <b>${esc(inst(k.inst).name)}</b>. New QR codes use it immediately; the old key remains valid for verification.`,ok:'Rotate key',onOk:()=>{k.gens++;k.kid=k.kid.replace(/\d{4}-\d{2}$/,'2026-10')+(k.gens>1?'':'');k.created=TODAY;closeOverlay();render();toast('Key rotated · generation v'+k.gens)}})},
+ createKey:el=>{const i=inst(el.dataset.id);D.keys.push({id:'k'+(D.keys.length+9),inst:i.id,kid:i.code.toLowerCase()+'-es256-2026-10',alg:'ES256',status:'Active',created:TODAY,gens:1});render();toast('Key created for '+i.name)},
+ /* inspector */
+ qrSample:el=>{ui().qrText=buildQR(el.dataset.k);ui().qrOut=inspectQR(ui().qrText);render()},
+ qrInspect:()=>{ui().qrText=$('#qrText').value;ui().qrOut=inspectQR(ui().qrText);render()},
+ qrClear:()=>{ui().qrText='';ui().qrOut=null;render()},
+ /* FI */
+ usagePage:el=>{ui().usagePage=+el.dataset.p;render()},
+ usageReset:()=>{Object.assign(ui(),{usageQ:'',usageMeter:'all',usageResult:'all',usageFrom:'',usageTo:'',usagePage:1});render()},
+ csvFiUsage:()=>{const l=filteredEvents();download('usage.csv',csv([['event_id','occurred_at','meter','client_reference','result','billable'],...l.map(e=>[e.id,e.at,e.meter,e.ref,e.verdict,e.billable])]));toast(l.length+' events exported')},
+ renewReq:()=>{openModal({title:'Request certificate renewal',text:'RVL support will contact '+esc(S.user.id)+' with the signing request instructions.',ok:'Send request',onOk:()=>{closeOverlay();toast('Renewal request sent')}})},
+ accTab:el=>{ui().accTab=el.dataset.t;render()},
+ notif:el=>{S.notify[el.dataset.k]=!S.notify[el.dataset.k];render();toast('Preference saved')},
+ changePw:()=>{const a=$('#pw0').value,b=$('#pw1').value,c=$('#pw2').value;let ok=true;const chk=(id,bad,m)=>{fieldErr(id,bad?m:'');if(bad)ok=false};
+  chk('pw0',a!==S.user.pw,'Current password is incorrect.');chk('pw1',!(b.length>=10&&/\d/.test(b)&&/[^A-Za-z0-9]/.test(b)),'Use 10+ characters with a number and a symbol.');chk('pw2',b!==c,'Passwords do not match.');
+  if(!ok)return;S.user.pw=b;render();toast('Password updated')},
+ renewNo:()=>{}
+};
+function popup(el,html){const host=el.closest('.rel');const had=host.querySelector('.pop');$$('.pop').forEach(p=>p.remove());if(had)return;host.insertAdjacentHTML('beforeend',html)}
+function wizard(step){const w=S.wiz||{};
+ openDrawer({title:'Add institution',wide:true,body:`<div class="steps"><div class="on"></div><div class="${step===2?'on':''}"></div></div>`+(step===1?`<div class="f"><label for="wn">Organisation name</label><input id="wn" value="${esc(w.name||'')}"><div class="e"></div></div><div class="row2"><div class="f"><label for="wt">Organisation type</label><select id="wt">${['Commercial bank','Islamic bank','Digital bank','Co-operative bank','Payment service provider'].map(t=>`<option ${w.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="f"><label for="wp">Phone</label><input id="wp" value="${esc(w.phone||'')}" placeholder="+880 …"></div></div><div class="row2"><div class="f"><label for="wc">Technical contact</label><input id="wc" value="${esc(w.contact||'')}"><div class="e"></div></div><div class="f"><label for="we">Contact email</label><input id="we" type="email" value="${esc(w.email||'')}"><div class="e"></div></div></div><div class="f"><label for="wa">Address</label><input id="wa" value="${esc(w.addr||'')}"></div>`
+  :`<div class="f"><label for="wdt">Document type</label><select id="wdt"><option>Trade licence</option><option>Bangladesh Bank approval letter</option><option>Authorised signatory list</option></select></div><div class="f"><label>Upload document</label><button type="button" class="btn" id="wd" data-act="fakeFile" style="width:100%;height:84px;border-style:dashed;flex-direction:column">${ic('up')} Choose a file to upload<span class="muted" style="font-weight:400">PDF up to 10 MB</span></button><div class="e"></div></div><p class="muted">The institution is created as <b>Pending</b>. Activate it after verifying documents and provisioning a credential.</p>`),
+  footer:step===1?`<button class="btn" data-act="close">Cancel</button><button class="btn pri" data-act="wizNext">Next ${ic('chev')}</button>`:`<button class="btn" data-act="wizBack">Back</button><button class="btn pri" data-act="wizSubmit">Create institution</button>`})}
+
+document.addEventListener('click',e=>{
+ const el=e.target.closest('[data-act]');
+ if(!e.target.closest('.rel'))$$('.pop').forEach(p=>p.remove());
+ if(!el)return;const a=A[el.dataset.act];if(a){if(el.tagName==='A'&&el.getAttribute('href')==='#')e.preventDefault();a(el,e)}});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.in;if(!k)return;handleIn(k,e.target)});
+document.addEventListener('change',e=>{const k=e.target.dataset&&e.target.dataset.in;if(!k||e.target.tagName==='INPUT'&&e.target.type==='text')return;handleIn(k,e.target)});
+function handleIn(k,t){
+ if(k==='qrText'){ui().qrText=t.value;return}
+ ui()[k]=t.value;if(k.startsWith('usage'))ui().usagePage=1;render()}
+document.addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&e.target.id==='gsearch'){const v=e.target.value.trim();if(S.user.surface==='fi'){ui().usageQ=v;ui().usagePage=1;go('#/fi/usage');render()}else{ui().instQ=v;go('#/staff/institutions');render()}}
+ if(e.key==='Enter'&&e.target.id==='fu')A.sendReset();
+});
+render();
+})();
+</script>
+</body>
+</html>

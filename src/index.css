@@ -1,0 +1,177 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Source of truth: DESIGN.md.
+ * Semantic names only; never use raw hex in components.
+ * Theme: light by default, dark via prefers-color-scheme or [data-theme="dark"].
+ * Surface: [data-surface="staff"] (green accent) or [data-surface="fi"] (blue accent).
+ */
+:root {
+  --accent: #14935a;
+  --accent-strong: #0e7547;
+  --accent-soft: #e3f4eb;
+  --on-accent: #ffffff;
+
+  --side: #052b52;
+  --side-2: #0a3d70;
+  --side-text: #a9c3de;
+  --side-head: #7897bb;
+
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #f9faf9;
+  --line: #e3e8e5;
+  --line-2: #cdd5d1;
+  --text: #101714;
+  --text-2: #46524c;
+  --text-3: #76827c;
+
+  --ok: #14935a;
+  --ok-bg: #e3f4eb;
+  --warn: #9a5b00;
+  --warn-bg: #fff2d9;
+  --bad: #c4302b;
+  --bad-bg: #fdeceb;
+  --info: #1d5fb8;
+  --info-bg: #e8f0fc;
+}
+
+[data-surface='fi'] {
+  --accent: #1c56c9;
+  --accent-strong: #1444a3;
+  --accent-soft: #e6eefc;
+  --side: #0a2f66;
+  --side-2: #12428a;
+  --side-text: #b3c8ec;
+  --side-head: #84a0d2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --accent: #2fc27f;
+    --accent-strong: #52d99a;
+    --accent-soft: #12372a;
+    --on-accent: #05130c;
+    --side: #04162b;
+    --side-2: #082440;
+    --bg: #0c0f0e;
+    --surface: #141917;
+    --surface-2: #181e1b;
+    --line: #252d29;
+    --line-2: #37413c;
+    --text: #edf2ef;
+    --text-2: #a8b4ae;
+    --text-3: #78857e;
+    --ok: #3ccf8a;
+    --ok-bg: #12372a;
+    --warn: #f0b24d;
+    --warn-bg: #3a2b0f;
+    --bad: #ff7d78;
+    --bad-bg: #3d1c1b;
+    --info: #7db2ff;
+    --info-bg: #172a46;
+  }
+  :root:not([data-theme='light'])[data-surface='fi'] {
+    --accent: #6a9bff;
+    --accent-strong: #8fb4ff;
+    --accent-soft: #16294f;
+    --on-accent: #06122b;
+  }
+}
+
+:root[data-theme='dark'] {
+  --accent: #2fc27f;
+  --accent-strong: #52d99a;
+  --accent-soft: #12372a;
+  --on-accent: #05130c;
+  --side: #04162b;
+  --side-2: #082440;
+  --bg: #0c0f0e;
+  --surface: #141917;
+  --surface-2: #181e1b;
+  --line: #252d29;
+  --line-2: #37413c;
+  --text: #edf2ef;
+  --text-2: #a8b4ae;
+  --text-3: #78857e;
+  --ok: #3ccf8a;
+  --ok-bg: #12372a;
+  --warn: #f0b24d;
+  --warn-bg: #3a2b0f;
+  --bad: #ff7d78;
+  --bad-bg: #3d1c1b;
+  --info: #7db2ff;
+  --info-bg: #172a46;
+}
+:root[data-theme='dark'][data-surface='fi'] {
+  --accent: #6a9bff;
+  --accent-strong: #8fb4ff;
+  --accent-soft: #16294f;
+  --on-accent: #06122b;
+}
+
+/* Expose tokens as Tailwind utilities: bg-surface, text-text-2, border-line, ... */
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-side: var(--side);
+  --color-side-2: var(--side-2);
+  --color-side-text: var(--side-text);
+  --color-side-head: var(--side-head);
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+
+  --font-sans: 'Inter Variable', 'Noto Sans Bengali', ui-sans-serif, system-ui, sans-serif;
+  --font-head: 'Montserrat Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', monospace;
+}
+
+html,
+body,
+#root {
+  min-height: 100svh;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Money and counts: tabular digits so columns align. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
