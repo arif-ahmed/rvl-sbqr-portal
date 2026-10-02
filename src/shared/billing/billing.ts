@@ -215,6 +215,16 @@ export function earlierStatements(data: BillingData, institutionId: string, peri
     })
 }
 
+/** Every statement an institution has, newest month first. Months without usage or a rate card have none. */
+export function institutionStatements(data: BillingData, institutionId: string): Statement[] {
+  return [...data.periods]
+    .reverse()
+    .flatMap((p) => {
+      const s = buildStatement(data, institutionId, p)
+      return s ? [s] : []
+    })
+}
+
 const csvCell =(value: string | number | boolean) => {
   const s = String(value)
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s

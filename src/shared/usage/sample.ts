@@ -20,7 +20,8 @@ export const sampleFiInstitutionId = 'inst-1'
 function build(): UsageEvent[] {
   const rand = seeded(20261002)
   const events: UsageEvent[] = []
-  let t = Date.UTC(2026, 9, 2, 10, 45)
+  // The last events of September 2026, the month still open in the billing store.
+  let t = Date.UTC(2026, 8, 30, 17, 45)
   for (let i = 0; i < 260; i++) {
     t -= Math.round(1 + rand() * 9) * 60_000 * (rand() < 0.1 ? 18 : 1)
     const d = new Date(t)

@@ -68,7 +68,7 @@ describe('institution detail', () => {
     const user = open('Shapla')
     await user.click(screen.getByRole('link', { name: 'Usage' }))
     expect(screen.getByText('Billable', { selector: 'dt' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Search usage')).toBeInTheDocument()
+    expect(screen.getByLabelText('Meter')).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Institution' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Overview' }))
     expect(screen.getByText('API credentials')).toBeInTheDocument()
@@ -76,7 +76,7 @@ describe('institution detail', () => {
 
   it('shows Finance the Usage tab', () => {
     open('Karnaphuli', 'finance', 'usage')
-    expect(screen.getByLabelText('Search usage')).toBeInTheDocument()
+    expect(screen.getByLabelText('Meter')).toBeInTheDocument()
   })
 
   it('explains when an institution has no rate card', () => {

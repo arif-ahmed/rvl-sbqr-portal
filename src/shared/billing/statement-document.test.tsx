@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { buildStatement, disputeWindowEnd, earlierStatements } from './billing'
+import { buildStatement, disputeWindowEnd, earlierStatements, institutionStatements } from './billing'
 import { StatementDocument } from './statement-document'
 import { getBilling } from './store'
 
@@ -30,6 +30,13 @@ describe('statement document', () => {
     expect(earlierStatements(data, 'inst-1', '2026-09').map((e) => e.period)).toEqual(['2026-04', '2026-05', '2026-06', '2026-07', '2026-08'])
     expect(earlierStatements(data, 'inst-1', '2026-06').map((e) => e.period)).toEqual(['2026-04', '2026-05'])
     expect(earlierStatements(data, 'inst-3', '2026-07')).toEqual([])
+  })
+
+  it('lists an institution’s statements newest first, skipping months with none', () => {
+    const data = getBilling()
+    expect(institutionStatements(data, 'inst-1').map((s) => s.period)).toEqual(['2026-09', '2026-08', '2026-07', '2026-06', '2026-05', '2026-04'])
+    expect(institutionStatements(data, 'inst-3').map((s) => s.period)).toEqual(['2026-09', '2026-08', '2026-07'])
+    expect(institutionStatements(data, 'inst-4')).toEqual([])
   })
 
   it('shows an approved bill with its approver, rates, adjustments, earlier months and dispute end', () => {

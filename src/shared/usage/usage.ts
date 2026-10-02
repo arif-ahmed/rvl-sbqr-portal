@@ -99,7 +99,6 @@ export function summarize(events: UsageEvent[]): UsageSummary {
 }
 
 export type UsageFilters = {
-  query: string
   meter: '' | Meter
   billing: '' | 'billable' | 'free'
   /** 'YYYY-MM-DD', inclusive. */
@@ -107,21 +106,22 @@ export type UsageFilters = {
   to: string
 }
 
-export const noFilters: UsageFilters = { query: '', meter: '', billing: '', from: '', to: '' }
+export const noFilters: UsageFilters = { meter: '', billing: '', from: '', to: '' }
 
 export const hasFilters = (f: UsageFilters) => Object.values(f).some(Boolean)
 
 export function filterEvents(events: UsageEvent[], f: UsageFilters): UsageEvent[] {
-  const q = f.query.trim().toLowerCase()
   return events.filter(
     (e) =>
       (!f.meter || e.meter === f.meter) &&
       (!f.billing || e.billable === (f.billing === 'billable')) &&
       (!f.from || e.at.slice(0, 10) >= f.from) &&
-      (!f.to || e.at.slice(0, 10) <= f.to) &&
-      (!q || `${e.ref} ${e.id}`.toLowerCase().includes(q)),
+      (!f.to || e.at.slice(0, 10) <= f.to),
   )
 }
+
+/** The billing period an event falls in, e.g. '2026-09'. */
+export const eventPeriod = (e: Pick<UsageEvent, 'at'>) => e.at.slice(0, 7)
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sampleEvents } from './sample'
-import { billingReason, eventsToCsv, filterEvents, formatEventTime, isBillable, noFilters, verdictCodes, verdictInfo } from './usage'
+import { billingReason, eventPeriod, eventsToCsv, filterEvents, formatEventTime, isBillable, noFilters, verdictCodes, verdictInfo } from './usage'
 
 describe('usage rules', () => {
   it('bills generations and every completed validation; only a stale request is free', () => {
@@ -33,7 +33,7 @@ describe('usage rules', () => {
     expect(sampleEvents.some((e) => e.verdict === 'REQUEST_STALE')).toBe(true)
   })
 
-  it('filters by meter, billing, dates and text', () => {
+  it('filters by meter, billing and dates', () => {
     const validations = filterEvents(sampleEvents, { ...noFilters, meter: 'VALIDATION' })
     expect(validations.length).toBeGreaterThan(0)
     expect(validations.every((e) => e.meter === 'VALIDATION')).toBe(true)
@@ -42,9 +42,11 @@ describe('usage rules', () => {
     expect(free.length).toBeGreaterThan(0)
     expect(free.every((e) => !e.billable)).toBe(true)
 
-    const first = sampleEvents[0]
-    expect(filterEvents(sampleEvents, { ...noFilters, query: first.ref.toLowerCase() }).map((e) => e.id)).toContain(first.id)
     expect(filterEvents(sampleEvents, { ...noFilters, from: '2999-01-01' })).toHaveLength(0)
+  })
+
+  it('puts every sample event in the open September period', () => {
+    expect(new Set(sampleEvents.map(eventPeriod))).toEqual(new Set(['2026-09']))
   })
 
   it('formats times and builds csv for the given rows only', () => {

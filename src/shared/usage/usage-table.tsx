@@ -1,25 +1,29 @@
 import { Download } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { downloadText } from '../download'
 import { Button, Card, EmptyRow, Input, Pager, Select, StatusChip, Table, Td, Th, Tr, toast } from '../ui'
 import { EventPanel } from './event-panel'
 import { billingReason, eventsToCsv, filterEvents, formatEventTime, hasFilters, meterLabel, meters, noFilters, verdictLabel, type UsageEvent, type UsageFilters } from './usage'
 
 const PER_PAGE = 12
 
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 /**
  * Usage events with filters, paging and CSV export. Shared by the FI and staff surfaces.
- * Pass `institutionName` to add an Institution column (staff view).
+ * Pass `institutionName` to add an Institution column (staff view). Pass `dates={false}` when
+ * the caller already limits the events to one billing period, so a date range would be noise.
+ * `csvName` names the exported file.
  */
-export function UsageTable({ events, institutionName }: { events: UsageEvent[]; institutionName?: (id: string) => string }) {
+export function UsageTable({
+  events,
+  institutionName,
+  dates = true,
+  csvName = 'usage.csv',
+}: {
+  events: UsageEvent[]
+  institutionName?: (id: string) => string
+  dates?: boolean
+  csvName?: string
+}) {
   const [filters, setFilters] = useState<UsageFilters>(noFilters)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<UsageEvent | null>(null)
@@ -34,14 +38,13 @@ export function UsageTable({ events, institutionName }: { events: UsageEvent[]; 
     setPage(1)
   }
   const exportCsv = () => {
-    download('usage.csv', eventsToCsv(rows))
+    downloadText(csvName, eventsToCsv(rows))
     toast.success(`${rows.length} events exported`)
   }
 
   return (
     <Card>
       <div className="flex flex-wrap items-center gap-2.5 border-b border-line p-4">
-        <Input aria-label="Search usage" placeholder="Client reference or event ID" className="w-full sm:w-64" value={filters.query} onChange={(e) => change({ query: e.target.value })} />
         <Select aria-label="Meter" className="w-auto" value={filters.meter} onChange={(e) => change({ meter: e.target.value as UsageFilters['meter'] })}>
           <option value="">All meters</option>
           {meters.map((m) => (
@@ -55,14 +58,18 @@ export function UsageTable({ events, institutionName }: { events: UsageEvent[]; 
           <option value="billable">Billed only</option>
           <option value="free">Not billed</option>
         </Select>
-        <label className="flex items-center gap-2 text-[13px] text-text-2">
-          From
-          <Input type="date" aria-label="From date" className="w-auto" value={filters.from} max={filters.to || undefined} onChange={(e) => change({ from: e.target.value })} />
-        </label>
-        <label className="flex items-center gap-2 text-[13px] text-text-2">
-          To
-          <Input type="date" aria-label="To date" className="w-auto" value={filters.to} min={filters.from || undefined} onChange={(e) => change({ to: e.target.value })} />
-        </label>
+        {dates && (
+          <>
+            <label className="flex items-center gap-2 text-[13px] text-text-2">
+              From
+              <Input type="date" aria-label="From date" className="w-auto" value={filters.from} max={filters.to || undefined} onChange={(e) => change({ from: e.target.value })} />
+            </label>
+            <label className="flex items-center gap-2 text-[13px] text-text-2">
+              To
+              <Input type="date" aria-label="To date" className="w-auto" value={filters.to} min={filters.from || undefined} onChange={(e) => change({ to: e.target.value })} />
+            </label>
+          </>
+        )}
         {hasFilters(filters) && (
           <Button size="sm" variant="ghost" onClick={() => change(noFilters)}>
             Reset
@@ -87,7 +94,7 @@ export function UsageTable({ events, institutionName }: { events: UsageEvent[]; 
           </tr>
         </thead>
         <tbody>
-          {shown.length === 0 && <EmptyRow cols={cols} title="No events match" hint="Adjust the filters or date range." />}
+          {shown.length === 0 && <EmptyRow cols={cols} title="No events match" hint={dates ? 'Adjust the filters or date range.' : 'Adjust the filters or pick another month.'} />}
           {shown.map((e) => {
             const reason = billingReason(e)
             return (

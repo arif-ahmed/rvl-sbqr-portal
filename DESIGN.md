@@ -100,7 +100,7 @@ Usage verdicts are shown with a readable label (`verdictLabel` in `src/shared/us
 
 Staff, Admin: Overview, Institutions (list, detail with Applications, Certificate and credentials, Billing; onboarding wizard), Crypto keys, QR inspector.
 Staff, Finance: Overview, Rate cards, Billing periods (finalize), Adjustments, Reports (monthly summary, by institution, revenue trend; Download PDF prints the view, Download CSV exports it). A statement opens as a printable A4 bill from Billing periods.
-Institution: Overview, Usage, Statements, Applications and certificate, Account.
+Institution: Overview, Usage (one billing period at a time: totals, months side by side, the month's events), Statements (list, and each one as a printable bill with a link to that month's usage), Applications and certificate, Account.
 Out of MVP: Payments, Dues.
 
 ## Notes
