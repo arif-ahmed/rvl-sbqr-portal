@@ -119,7 +119,7 @@ export function AppShell(props: { surface: Surface; session: Session; nav: NavIt
             </Menu.Portal>
           </Menu.Root>
         </header>
-        <main className="max-w-[1360px] p-4 lg:p-7 print:p-0">{children}</main>
+        <main className="max-w-[1360px] p-4 lg:p-7 print:max-w-none print:px-[16mm] print:pt-[14mm] print:pb-[26mm]">{children}</main>
       </div>
     </div>
   )

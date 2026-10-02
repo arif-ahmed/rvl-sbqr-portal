@@ -212,6 +212,30 @@ body {
   section {
     break-inside: avoid;
   }
+  /* Keep the tinted bands and table headers that carry meaning. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  html,
+  body,
+  #root {
+    min-height: 0;
+    background: #ffffff;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+}
+
+/* A4 with zero page margin: this is what stops the browser printing its own URL, date and page
+   count in the margins. The page margin comes back as padding on <main> (app-shell). */
+@page {
+  size: A4;
+  margin: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

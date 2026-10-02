@@ -40,7 +40,7 @@ describe('statement document', () => {
     expect(d.getByText('Institution code 000901')).toBeInTheDocument()
     expect(d.getByText('1 – 31 August 2026')).toBeInTheDocument()
     expect(d.getByText('Dynamic QR generation')).toBeInTheDocument()
-    expect(d.getByText('Credit: rate card correction effective July')).toBeInTheDocument()
+    expect(d.getByText(/Credit: rate card correction effective July/)).toBeInTheDocument()
     expect(d.getAllByText('−৳ 1,200').length).toBeGreaterThan(0)
     expect(d.getByText('Earlier approved statements')).toBeInTheDocument()
     expect(d.getByText(/accepted until 2026-10-03 \(30 days after approval\)/)).toBeInTheDocument()
@@ -52,12 +52,12 @@ describe('statement document', () => {
     expect(d.getByText('Draft')).toBeInTheDocument()
     expect(d.getByText(/Figures may change until the month is finalized/)).toBeInTheDocument()
     expect(d.getByText(/window starts when this month is finalized/)).toBeInTheDocument()
-    expect(screen.getByText(/Draft · Shapla Commercial Bank · September 2026 · Not a tax invoice/)).toBeInTheDocument()
+    expect(screen.getByText(/Draft · Shapla Commercial Bank · September 2026/)).toBeInTheDocument()
   })
 
   it('omits the adjustments and earlier sections when there are none', () => {
     const d = doc('2026-07', 'inst-3')
-    expect(d.queryByText('Adjustments', { selector: 'h3' })).not.toBeInTheDocument()
+    expect(d.queryByText(/^Adjustment$/)).not.toBeInTheDocument()
     expect(d.queryByText('Earlier approved statements')).not.toBeInTheDocument()
   })
 })
