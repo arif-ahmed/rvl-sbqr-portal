@@ -55,6 +55,14 @@ describe('App', () => {
     expect(screen.queryByRole('link', { name: 'Billing periods' })).not.toBeInTheDocument()
   })
 
+  it('lets Admin, but not Finance, open institution onboarding', async () => {
+    await signInAs('Finance')
+    await screen.findByRole('link', { name: 'Billing periods' })
+    window.history.pushState({}, '', '/staff/institutions/new')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await waitFor(() => expect(window.location.pathname).toBe('/staff/institutions'))
+  })
+
   it('keeps an institution user out of staff routes', async () => {
     await signInAs('Institution')
     expect(await screen.findByRole('link', { name: 'Statements' })).toBeInTheDocument()
