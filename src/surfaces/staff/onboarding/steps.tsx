@@ -8,8 +8,9 @@ import { certSchema } from '../institutions/schemas'
 import { takenCodes } from '../institutions/store'
 import type { Access, Certificate, KeyMode, Profile } from '../institutions/types'
 import { InstitutionPicker } from './institution-picker'
-import { institutionRegistry, type RegistryEntry } from './institution-registry'
+import { type RegistryEntry } from './institution-registry'
 import { institutionCode, institutionTypes, typeLabel } from './institution-types'
+import { useInstitutionDirectory } from './use-institution-directory'
 import { price, type RateCard } from '../rates/rates'
 
 // UI-only for now: nothing here calls the API.
@@ -52,9 +53,12 @@ export function InstitutionStep(props: { initial: Profile | null; locked: boolea
   const { errors } = form.formState
   const [type, institutionId] = useWatch({ control: form.control, name: ['type', 'institutionId'] })
 
-  // The name is fixed by the regulator, so it is picked from the registry rather than typed.
+  // The name is fixed by the regulator, so it is picked from the directory rather than typed.
   // "Not listed" falls back to manual entry (also the only way to add an NBFI).
-  const inRegistry = (p: Profile | null) => institutionRegistry.find((e) => p && e.type === p.type && e.id === p.institutionId) ?? null
+  // The directory is live from GET /v1/admin/institutions with the static Annex A
+  // registry as fallback when the API is unreachable.
+  const directory = useInstitutionDirectory()
+  const inRegistry = (p: Profile | null) => directory.entries.find((e) => p && e.type === p.type && e.id === p.institutionId) ?? null
   const [picked, setPicked] = useState<RegistryEntry | null>(() => inRegistry(initial))
   const [manual, setManual] = useState(() => !!initial && !inRegistry(initial))
 
@@ -115,13 +119,19 @@ export function InstitutionStep(props: { initial: Profile | null; locked: boolea
               label="Institution"
               htmlFor="institution"
               error={errors.name || errors.type || errors.institutionId ? 'Choose an institution from the list.' : undefined}
-              hint="Registered Bangla QR institutions. Choosing one fills in its type and code."
+              hint={
+                directory.live
+                  ? 'Registered Bangla QR institutions. Choosing one fills in its type and code.'
+                  : 'Trust directory unreachable — showing the built-in list. Choosing one fills in its type and code.'
+              }
             >
               <InstitutionPicker
                 value={picked}
                 disabled={locked}
                 invalid={!!(errors.name || errors.institutionId)}
+                entries={directory.entries}
                 taken={takenCodes()}
+                frozen={directory.frozen}
                 onChange={(e) => {
                   setPicked(e)
                   setIdentity(e?.name ?? '', e?.type ?? '', e?.id ?? '')

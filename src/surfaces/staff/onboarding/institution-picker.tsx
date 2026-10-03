@@ -11,12 +11,16 @@ const codeOf = (e: RegistryEntry) => institutionCode(e.type, e.id)
 export function InstitutionPicker(props: {
   value: RegistryEntry | null
   onChange: (entry: RegistryEntry | null) => void
+  /** Directory universe to search. Defaults to the static Annex A registry. */
+  entries?: RegistryEntry[]
   /** Institution codes that already have a tenant; shown but not selectable. */
   taken: string[]
+  /** Directory codes whose trust status is not ACTIVE; shown but not selectable. */
+  frozen?: string[]
   disabled?: boolean
   invalid?: boolean
 }) {
-  const { value, onChange, taken, disabled, invalid } = props
+  const { value, onChange, entries = institutionRegistry, taken, frozen = [], disabled, invalid } = props
   const listId = useId()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -44,11 +48,13 @@ export function InstitutionPicker(props: {
   }
 
   const q = query.trim().toLowerCase()
-  const matches = institutionRegistry.filter((e) => !q || e.name.toLowerCase().includes(q) || codeOf(e).startsWith(q))
+  const matches = entries.filter((e) => !q || e.name.toLowerCase().includes(q) || codeOf(e).startsWith(q))
   const isTaken = (e: RegistryEntry) => taken.includes(codeOf(e))
+  const isFrozen = (e: RegistryEntry) => frozen.includes(codeOf(e))
+  const blocked = (e: RegistryEntry) => isTaken(e) || isFrozen(e)
 
   function choose(e: RegistryEntry) {
-    if (isTaken(e)) return
+    if (blocked(e)) return
     onChange(e)
     setQuery('')
     setOpen(false)
@@ -99,17 +105,17 @@ export function InstitutionPicker(props: {
               id={`${listId}-${i}`}
               role="option"
               aria-selected={i === active}
-              aria-disabled={isTaken(e)}
+              aria-disabled={blocked(e)}
               // mousedown, not click: the input would blur and close the list first.
               onMouseDown={(ev) => {
                 ev.preventDefault()
                 choose(e)
               }}
-              className={cn('flex items-center justify-between gap-3 px-4 py-2.5', i === active && 'bg-surface-2', isTaken(e) ? 'cursor-not-allowed text-text-3' : 'cursor-pointer')}
+              className={cn('flex items-center justify-between gap-3 px-4 py-2.5', i === active && 'bg-surface-2', blocked(e) ? 'cursor-not-allowed text-text-3' : 'cursor-pointer')}
             >
               <span className="min-w-0 truncate">{e.name}</span>
               <span className="shrink-0 text-[12.5px] text-text-3">
-                {isTaken(e) ? 'Already onboarded' : typeLabel(e.type).split(' (')[0]} · <span className="num">{codeOf(e)}</span>
+                {isTaken(e) ? 'Already onboarded' : isFrozen(e) ? 'Trust inactive' : typeLabel(e.type).split(' (')[0]} · <span className="num">{codeOf(e)}</span>
               </span>
             </li>
           ))}
