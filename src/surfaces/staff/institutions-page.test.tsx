@@ -29,7 +29,7 @@ describe('institutions list', () => {
     setup()
     expect(screen.getAllByRole('row')).toHaveLength(8)
     expect(within(row('Karnaphuli')).getByText(/Certificate expires in/)).toBeInTheDocument()
-    expect(within(row('Surma')).getByText(/of 4 setup items done/)).toBeInTheDocument()
+    expect(within(row('Surma')).getByText(/of 5 setup items done/)).toBeInTheDocument()
   })
 
   it('filters by search and status', async () => {

@@ -30,7 +30,7 @@ describe('institution detail', () => {
 
   it('shows setup progress and Continue setup for a pending institution with gaps', () => {
     open('Surma')
-    expect(screen.getByText('2 of 4 done')).toBeInTheDocument()
+    expect(screen.getByText('2 of 5 done')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue setup' })).toBeInTheDocument()
     expect(screen.getByText('No certificate registered yet.')).toBeInTheDocument()
   })
@@ -92,11 +92,14 @@ describe('institution detail', () => {
     expect(screen.getByText(/validation is allowed/)).toBeInTheDocument()
   })
 
-  it('tells the admin when activating an institution that has no rate card', async () => {
+  it('offers no activation until a rate card is in effect', async () => {
     const user = open('Surma')
     await user.click(screen.getByRole('button', { name: /More actions/ }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Activate' }))
-    expect(await screen.findByText(/no rate card yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Activate' })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    addRateCard({ institutionId: 'inst-4', effectiveFrom: `${currentMonth()}-01`, generationRate: 0.5, validationRate: 0.1 })
+    await user.click(screen.getByRole('button', { name: /More actions/ }))
+    expect(await screen.findByRole('menuitem', { name: 'Activate' })).toBeInTheDocument()
   })
 
   it('does not mention pricing when activating an institution that has a rate card', async () => {
@@ -117,6 +120,21 @@ describe('institution detail', () => {
     open('Surma', 'admin', 'usage')
     expect(screen.queryByRole('link', { name: 'Usage' })).not.toBeInTheDocument()
     expect(screen.getByText('Setup progress')).toBeInTheDocument()
+  })
+
+  it('manages credentials from the API credentials card', () => {
+    open('Shapla')
+    expect(screen.getByRole('button', { name: 'Manage credentials' })).toBeInTheDocument()
+  })
+
+  it('offers no credential management once terminated', () => {
+    open('Doyel')
+    expect(screen.queryByRole('button', { name: 'Manage credentials' })).not.toBeInTheDocument()
+  })
+
+  it('offers no credential management before credentials are issued', () => {
+    open('Nilgiri')
+    expect(screen.queryByRole('button', { name: 'Manage credentials' })).not.toBeInTheDocument()
   })
 
   it('returns to the list for an unknown institution', () => {

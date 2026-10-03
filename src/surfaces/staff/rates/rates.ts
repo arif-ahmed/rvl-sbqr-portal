@@ -30,6 +30,9 @@ export function cardFor(cards: RateCard[], institutionId: string, month: string)
   )
 }
 
+/** Whether this month is already priced for the institution — the wizard and activation gate's test. */
+export const hasCardInEffect = (cards: RateCard[], institutionId: string, now = new Date()) => cardFor(cards, institutionId, currentMonth(now)) !== null
+
 /** Scheduled (not started, can be withdrawn), In effect, or Superseded by a later card that has started. */
 export function cardState(card: RateCard, cards: RateCard[], now = new Date()): CardState {
   const cur = currentMonth(now)
@@ -69,7 +72,8 @@ export function accessSummary(access: { generation: boolean; validation: boolean
 /** Only a card that has not taken effect can be withdrawn. */
 export const canWithdraw = (card: RateCard, cards: RateCard[], now = new Date()) => cardState(card, cards, now) === 'Scheduled'
 
-const price = z.string().trim().regex(/^\d+(\.\d{1,4})?$/, 'Enter a price in BDT with up to 4 decimals.')
+/** A per-call price as form text: BDT, up to 4 decimals, zero allowed. Shared by the Rates drawer and onboarding. */
+export const price = z.string().trim().regex(/^\d+(\.\d{1,4})?$/, 'Enter a price in BDT with up to 4 decimals.')
 
 /** A price starts on the 1st of a month, and only a future month. The form holds prices as text. */
 export const rateCardSchema = z.object({

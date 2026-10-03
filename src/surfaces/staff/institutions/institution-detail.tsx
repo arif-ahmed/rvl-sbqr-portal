@@ -5,6 +5,8 @@ import type { Role } from '../../../shared/auth/session'
 import { cn } from '../../../shared/cn'
 import { Banner, Button, Card, CardHeader, StatusChip } from '../../../shared/ui'
 import { typeLabel } from '../onboarding/institution-types'
+import { cardFor, currentMonth } from '../rates/rates'
+import { useRateCards } from '../rates/store'
 import { InstitutionUsageTab } from '../usage/institution-usage'
 import { ActionButtons } from './action-buttons'
 import { daysUntil, setupItems } from './actions'
@@ -38,7 +40,8 @@ function keyText(i: Institution) {
 export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?: 'overview' | 'usage' | 'billing' }) {
   const { id } = useParams()
   const institutions = useInstitutions()
-  const { run, dialogs } = useInstitutionActions()
+  const cards = useRateCards()
+  const { run, manageCredentials, dialogs } = useInstitutionActions()
   const inst = institutions.find((i) => i.id === id)
   if (!inst) return <Navigate to="/staff/institutions" replace />
   // A pending institution cannot have usage yet, so it has no Usage or Billing tab.
@@ -46,7 +49,7 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
   if ((tab === 'usage' || tab === 'billing') && !hasUsage) return <Navigate to={`/staff/institutions/${inst.id}`} replace />
 
   const canManage = role === 'admin'
-  const items = setupItems(inst)
+  const items = setupItems(inst, !!cardFor(cards, inst.id, currentMonth()))
   const done = items.filter((s) => s.done).length
   const expiry = inst.certificate && inst.status === 'Active' ? daysUntil(inst.certificate.expiresAt) : null
 
@@ -134,7 +137,16 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
 
         <div className="flex flex-col gap-4">
           <Card>
-            <CardHeader title="API credentials" />
+            <CardHeader
+              title="API credentials"
+              actions={
+                canManage && inst.access && inst.status !== 'Terminated' ? (
+                  <Button size="sm" onClick={() => manageCredentials(inst.id)}>
+                    Manage credentials
+                  </Button>
+                ) : undefined
+              }
+            />
             {inst.access ? (
               <>
                 <Facts

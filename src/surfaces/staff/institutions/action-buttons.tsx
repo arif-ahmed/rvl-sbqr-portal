@@ -1,12 +1,15 @@
 import * as Menu from '@radix-ui/react-dropdown-menu'
 import { MoreHorizontal } from 'lucide-react'
 import { Button } from '../../../shared/ui'
+import { cardFor, currentMonth } from '../rates/rates'
+import { useRateCards } from '../rates/store'
 import { actionLabel, actionsFor, type ActionId } from './actions'
 import type { Institution } from './types'
 
 /** The main next step as a button plus the rest in a "more" menu. Used by the list rows and the detail page. */
 export function ActionButtons({ inst, onAction }: { inst: Institution; onAction: (i: Institution, a: ActionId) => void }) {
-  const { primary, menu } = actionsFor(inst)
+  const cards = useRateCards()
+  const { primary, menu } = actionsFor(inst, !!cardFor(cards, inst.id, currentMonth()))
   return (
     // The list row opens the detail page on click; actions must not.
     <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>

@@ -8,6 +8,8 @@ import { ActionButtons } from './institutions/action-buttons'
 import { useInstitutionActions } from './institutions/use-institution-actions'
 import { useInstitutions } from './institutions/store'
 import type { InstitutionStatus } from './institutions/types'
+import { cardFor, currentMonth } from './rates/rates'
+import { useRateCards } from './rates/store'
 import { institutionTypes, typeLabel } from './onboarding/institution-types'
 
 const statuses: InstitutionStatus[] = ['Pending', 'Active', 'Suspended', 'Terminated']
@@ -16,6 +18,7 @@ const statuses: InstitutionStatus[] = ['Pending', 'Active', 'Suspended', 'Termin
 export function InstitutionsPage({ role }: { role: Role }) {
   const navigate = useNavigate()
   const institutions = useInstitutions()
+  const cards = useRateCards()
   const canManage = role === 'admin'
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
@@ -71,7 +74,7 @@ export function InstitutionsPage({ role }: { role: Role }) {
           <tbody>
             {rows.length === 0 && <EmptyRow cols={canManage ? 6 : 5} title="No institutions match" hint="Clear the search or filters." />}
             {rows.map((inst) => {
-              const note = institutionNote(inst)
+              const note = institutionNote(inst, !!cardFor(cards, inst.id, currentMonth()))
               return (
                 // The name is a real link for keyboard and screen readers; the row click is the mouse shortcut.
                 <Tr key={inst.id} onClick={() => navigate(`/staff/institutions/${inst.id}`)}>
