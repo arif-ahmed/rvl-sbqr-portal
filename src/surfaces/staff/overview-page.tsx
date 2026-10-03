@@ -1,4 +1,4 @@
-import { AlertTriangle, Building2, ChevronRight, Clock, CreditCard, Flag, Info, QrCode } from 'lucide-react'
+import { AlertTriangle, Building2, ChevronRight, Clock, CreditCard, Flag, Info, Plus, QrCode } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '../../shared/auth/session'
@@ -85,7 +85,7 @@ export function OverviewPage({ session }: { session: Session }) {
           </Button>
         ) : (
           <Button variant="primary" onClick={() => navigate('/staff/institutions/new')}>
-            <Building2 className="size-4" aria-hidden /> Add institution
+            <Plus className="size-4" aria-hidden /> Add institution
           </Button>
         )}
       </section>
