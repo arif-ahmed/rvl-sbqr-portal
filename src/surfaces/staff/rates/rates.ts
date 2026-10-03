@@ -30,9 +30,6 @@ export function cardFor(cards: RateCard[], institutionId: string, month: string)
   )
 }
 
-/** Whether this month is already priced for the institution — the wizard and activation gate's test. */
-export const hasCardInEffect = (cards: RateCard[], institutionId: string, now = new Date()) => cardFor(cards, institutionId, currentMonth(now)) !== null
-
 /** Scheduled (not started, can be withdrawn), In effect, or Superseded by a later card that has started. */
 export function cardState(card: RateCard, cards: RateCard[], now = new Date()): CardState {
   const cur = currentMonth(now)
