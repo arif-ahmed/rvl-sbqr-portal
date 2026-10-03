@@ -18,7 +18,7 @@ npm ci
 npm run dev            # http://localhost:5175
 ```
 
-Sign-in uses demo accounts while the API has no per-user login: `.env.example` sets `VITE_MOCK_AUTH=true`, and the login page then lists them (password `Demo@1234`). With the flag off, sign-in is refused. Replace `signIn` in `src/shared/auth/session.ts` when the real endpoint exists.
+Sign-in exchanges API client credentials at `POST /v1/oauth/token` (OAuth 2.1 client-credentials): the login form's Client ID / Client secret are the `client_id` / `client_secret`, and the minted bearer token — held in memory only — authenticates later `/v1` calls and is re-minted 30s before it expires. For the prototype phase `.env.example` also sets `VITE_MOCK_AUTH=true`, which replaces the form with demo accounts (password `Demo@1234`); leave that flag off in production.
 
 | Command | What it does |
 |---|---|
@@ -40,7 +40,7 @@ src/
   surfaces/staff/     RVL Admin and Finance screens
   surfaces/fi/        Institution screens
   pages/login.tsx     sign-in for both audiences
-  shared/auth         in-memory session, sign-in (mock until the API has user login)
+  shared/auth         in-memory session, sign-in (client credentials; demo accounts behind VITE_MOCK_AUTH)
   shared/layout       AppShell (sidebar, top bar), ComingSoon placeholder
   shared/ui           design-system components
   shared/             format helpers, cn, theme
@@ -63,7 +63,7 @@ Vite, React 19, TypeScript, Tailwind v4, Radix, TanStack Query, react-hook-form 
 
 ## Backend dependencies (not built yet)
 
-- Per-user login (today only client-credentials exists).
+- Per-user login (sign-in today is a shared client-credentials exchange, one credential per tenant/staff console).
 - Separate Finance role/scope (today a single `admin` scope).
 - FI-scoped read endpoints for own usage and statements.
 - `FinalizedBy` taken from the token, not the request body.

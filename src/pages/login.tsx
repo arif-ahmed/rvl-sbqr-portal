@@ -8,9 +8,12 @@ import { homePath, signIn, useSession, type Surface } from '../shared/auth/sessi
 import { cn } from '../shared/cn'
 import { Banner, Button, Field, Input } from '../shared/ui'
 
+// The API has no per-user accounts yet, so sign-in is a client-credentials
+// exchange (POST /v1/oauth/token): the "username" is the client_id and the
+// "password" the client_secret issued at provisioning (AGENTS.md).
 const schema = z.object({
-  userId: z.string().trim().min(1, 'Enter your user ID.'),
-  password: z.string().min(1, 'Enter your password.'),
+  clientId: z.string().trim().min(1, 'Enter your client ID.'),
+  clientSecret: z.string().min(1, 'Enter your client secret.'),
 })
 type Values = z.infer<typeof schema>
 
@@ -18,12 +21,12 @@ const copy: Record<Surface, { headline: string; text: string; hint: string }> = 
   fi: {
     headline: 'Your QR usage, statements and credentials in one place.',
     text: 'Review every generation and validation, download monthly statements and keep your certificate current.',
-    hint: 'you@yourbank.example',
+    hint: 'your-client-id',
   },
   staff: {
     headline: 'Run QR operations and billing with confidence.',
     text: 'Onboard institutions, manage keys, set rate cards and close each billing month with a full audit trail.',
-    hint: 'you@rvl.example',
+    hint: 'platform-bootstrap',
   },
 }
 
@@ -33,7 +36,7 @@ export default function LoginPage() {
   const [surface, setSurface] = useState<Surface>('fi')
   const [error, setError] = useState('')
   const [showPw, setShowPw] = useState(false)
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { userId: '', password: '' } })
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { clientId: '', clientSecret: '' } })
   const { errors, isSubmitting } = form.formState
 
   // The login screen takes its look from the chosen audience, like the signed-in app does.
@@ -46,7 +49,7 @@ export default function LoginPage() {
   async function onSubmit(v: Values) {
     setError('')
     try {
-      const next = await signIn(v.userId, v.password, surface)
+      const next = await signIn(v.clientId, v.clientSecret, surface)
       navigate(homePath(next), { replace: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not sign in.')
@@ -94,16 +97,16 @@ export default function LoginPage() {
           {error && <Banner tone="bad" title={error} />}
 
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-            <Field label="User ID" htmlFor="userId" error={errors.userId?.message}>
-              <Input id="userId" autoComplete="username" placeholder={copy[surface].hint} aria-invalid={!!errors.userId} {...form.register('userId')} />
+            <Field label="Client ID" htmlFor="clientId" error={errors.clientId?.message}>
+              <Input id="clientId" autoComplete="off" placeholder={copy[surface].hint} aria-invalid={!!errors.clientId} {...form.register('clientId')} />
             </Field>
-            <Field label="Password" htmlFor="password" error={errors.password?.message}>
+            <Field label="Client secret" htmlFor="clientSecret" error={errors.clientSecret?.message} hint="Issued when the account was provisioned and shown only once.">
               <div className="relative">
-                <Input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" aria-invalid={!!errors.password} {...form.register('password')} />
+                <Input id="clientSecret" type={showPw ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-invalid={!!errors.clientSecret} {...form.register('clientSecret')} />
                 <button
                   type="button"
                   className="absolute top-1 right-1.5 grid size-8 place-items-center text-text-3"
-                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  aria-label={showPw ? 'Hide client secret' : 'Show client secret'}
                   onClick={() => setShowPw((s) => !s)}
                 >
                   {showPw ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
@@ -115,7 +118,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {import.meta.env.VITE_MOCK_AUTH === 'true' && <DemoAccounts surface={surface} onPick={(id, pw) => { form.setValue('userId', id); form.setValue('password', pw) }} />}
+          {import.meta.env.VITE_MOCK_AUTH === 'true' && <DemoAccounts surface={surface} onPick={(id, pw) => { form.setValue('clientId', id); form.setValue('clientSecret', pw) }} />}
         </div>
       </section>
     </div>

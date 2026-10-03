@@ -32,8 +32,8 @@ export type DirectoryState = {
 }
 
 /** Trust directory for the onboarding picker. Falls back to the static Annex A
- *  registry when the API is unreachable or no bootstrap secret is configured,
- *  so onboarding never hard-blocks on the network. */
+ *  registry when the API is unreachable or nobody is signed in, so onboarding
+ *  never hard-blocks on the network. */
 export function useInstitutionDirectory(): DirectoryState {
   const [state, setState] = useState<DirectoryState>({
     entries: institutionRegistry,
