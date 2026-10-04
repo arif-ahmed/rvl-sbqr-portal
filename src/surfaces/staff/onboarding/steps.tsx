@@ -515,7 +515,7 @@ export function ReviewStep(
       <Blockers blockers={blockers} />
       {onboarding && !onboarding.hasRateCard && (
         <Banner tone="info" title="No rate card yet">
-          You can activate without one, but usage is recorded and never billed until a rate card takes effect. Rate cards start on the 1st of a future month and are set from Rates.
+          You can activate without one, but usage is recorded and never billed until a rate card takes effect. Rate cards start on the 1st of the current or a future month and are set from Rates.
         </Banner>
       )}
       <StepError error={error} />

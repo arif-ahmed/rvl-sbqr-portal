@@ -14,14 +14,15 @@ beforeEach(async () => {
 afterEach(() => backend.reset())
 
 /** Open an institution by its seeded id ('inst-1' is Shapla, 'inst-4' is Surma, ...). */
-function open(id: string, role: Role = 'admin', tab: 'overview' | 'usage' = 'overview') {
+function open(id: string, role: Role = 'admin', tab: 'overview' | 'usage' | 'billing' = 'overview') {
   renderApp(
     <Routes>
       <Route path="/staff/institutions" element={<p>list</p>} />
       <Route path="/staff/institutions/:id" element={<InstitutionDetail role={role} />} />
       <Route path="/staff/institutions/:id/usage" element={<InstitutionDetail role={role} tab="usage" />} />
+      <Route path="/staff/institutions/:id/billing" element={<InstitutionDetail role={role} tab="billing" />} />
     </Routes>,
-    [`/staff/institutions/${id}${tab === 'usage' ? '/usage' : ''}`],
+    [`/staff/institutions/${id}${tab === 'usage' ? '/usage' : tab === 'billing' ? '/billing' : ''}`],
   )
   return userEvent.setup()
 }
@@ -115,6 +116,27 @@ describe('institution detail', () => {
     open('inst-1', 'admin', 'usage')
     await screen.findByLabelText('Meter')
     expect(screen.queryByText('No rate card')).not.toBeInTheDocument()
+  })
+
+  it('shows the API rate card in effect on the billing tab when one exists', async () => {
+    // inst-1 is seeded with two cards: YYYY-01-01 (in effect) and nextMonth-01 (scheduled).
+    const year = new Date().getFullYear()
+    open('inst-1', 'admin', 'billing')
+    // The Generation/Validation <dd>s only render when a card is found.
+    expect(await screen.findByText('৳ 0.50 / call')).toBeInTheDocument()
+    expect(screen.getByText('৳ 0.125 / call')).toBeInTheDocument()
+    expect(screen.getByText(`January ${year}`)).toBeInTheDocument()
+    // The fetch went to the real endpoint, with this tenant's id.
+    expect(backend.callsTo('GET', '/v1/admin/billing/rate-cards?tenantId=inst-1')).toHaveLength(1)
+    expect(screen.getByRole('link', { name: /Manage rate cards/ })).toBeInTheDocument()
+  })
+
+  it('shows the no-rate-card empty state on the billing tab when the API has no cards', async () => {
+    // inst-3 has no rate cards in the seed, and the API confirms it.
+    open('inst-3', 'admin', 'billing')
+    expect(await screen.findByText('No rate card')).toBeInTheDocument()
+    expect(screen.queryByText('৳ 0.50 / call')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Manage rate cards/ })).toBeInTheDocument()
   })
 
   it('activates a pending institution that is ready, and shows why one is not', async () => {

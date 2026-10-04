@@ -2,12 +2,13 @@ import { vi } from 'vitest'
 import { authenticate, resetApiClient } from '../shared/api/client'
 import type { OnboardingDto, OnboardingStepDto, StepCode, StepStatus, TenantDto } from '../surfaces/staff/institutions/api/types'
 import { stepOrder } from '../surfaces/staff/institutions/api/types'
+import type { CreateRateCardDto, RateCardDto } from '../surfaces/staff/rates/api/types'
 
-// An in-memory stand-in for the tenant onboarding API, following the contract in
-// docs/features/institution-onboarding/implementation-guide.md (section 2). It lets the staff
-// screens run end to end in jsdom: every request goes through the real api client and
-// TanStack Query. It is deliberately small — the rules it mirrors are the reconcile table,
-// the activation blockers and the 409 for a repeated credential issue.
+// An in-memory stand-in for the platform admin API (rvl-secure-bqr-manager). It now serves
+// both the tenant onboarding endpoints (docs/features/institution-onboarding/implementation-guide.md
+// section 2) and the rate-cards endpoints (src/Modules/Billing/SBQR.Modules.Billing.Api/Controllers/RateCardsController.cs)
+// so the staff screens can run end to end in jsdom. Every request goes through the real api
+// client and TanStack Query.
 
 type Tenant = Omit<TenantDto, 'hasRateCard' | 'onboarding'>
 
@@ -19,6 +20,8 @@ type Rec = {
   certSkipped: boolean
   signingKey: boolean
   hasRateCard: boolean
+  /** Per-tenant rate cards, newest EffectiveFrom first — matches the server's order. */
+  rateCards: RateCardDto[]
   /** Whether the institution is in the trust directory. Activation needs it. */
   trust: boolean
 }
@@ -27,6 +30,15 @@ export type Call = { method: string; path: string; body: unknown }
 
 const adminJwt = `h.${btoa(JSON.stringify({ sub: 'platform-admin', scope: ['admin'] }))}.s`
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString()
+const pad = (n: number) => String(n).padStart(2, '0')
+const ymd = (y: number, m: number) => `${y}-${pad(m)}-01`
+const monthOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
+const nextMonth = (d = new Date()) => {
+  const n = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+  return monthOf(n)
+}
+let rateCardCounter = 0
+const newRateCardId = () => `rc-${++rateCardCounter}-${Math.random().toString(36).slice(2, 10)}`
 
 function tenant(id: string, name: string, code: string, status: string, contact: string, email: string, caps = { gen: true, val: true }): Tenant {
   return {
@@ -46,18 +58,33 @@ function tenant(id: string, name: string, code: string, status: string, contact:
 }
 
 const cert = (subject: string, days: number) => ({ thumbprintSha256: 'A1'.repeat(32), subject, expiresAt: inDays(days) })
-const blank = { configSaved: false, credential: null, certificate: null, certSkipped: false, signingKey: false, hasRateCard: false, trust: true }
+// `blank` is a factory so every record starts with a fresh `rateCards` array —
+// otherwise `rec.rateCards.unshift(...)` in `addRateCard` would mutate the shared
+// reference and bleed across tests.
+const blank = () => ({ configSaved: false, credential: null, certificate: null, certSkipped: false, signingKey: false, hasRateCard: false, rateCards: [] as RateCardDto[], trust: true })
+
+const rateCard = (tenantId: string, effectiveFrom: string, generationRate: number, validationRate: number): RateCardDto => ({
+  rateCardId: newRateCardId(),
+  tenantId,
+  effectiveFrom,
+  generationRate,
+  validationRate,
+  currency: 'BDT',
+  createdBy: 'platform:admin',
+})
 
 /** The institutions the list and detail tests expect (same ids and names as the old mock data). */
 function seed(): Rec[] {
+  const now = new Date()
+  const year = now.getFullYear()
   return [
-    { ...blank, tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, certificate: cert('CN=gateway.shaplabank.example', 300), signingKey: true, hasRateCard: true },
-    { ...blank, tenant: tenant('inst-2', 'Karnaphuli Trust Bank', '000902', 'ACTIVE', 'Sabina Yasmin', 'sabina@karnaphulitrust.example'), configSaved: true, credential: { clientId: '000902-b40e5a11' }, certificate: cert('CN=gateway.karnaphulitrust.example', 12), signingKey: true, hasRateCard: true },
-    { ...blank, tenant: tenant('inst-3', 'Teesta Digital Wallet', '022901', 'ACTIVE', 'Nusrat Jahan', 'nusrat@teestawallet.example', { gen: false, val: true }), configSaved: true, credential: { clientId: '022901-e93b6f48' }, certificate: cert('CN=gateway.teestawallet.example', 210), signingKey: true },
-    { ...blank, tenant: tenant('inst-4', 'Surma Payments Ltd', '032901', 'PENDING', 'Jahid Hasan', 'jahid.hasan@surmapayments.example'), configSaved: true, credential: { clientId: '032901-3f9a1c20' } },
-    { ...blank, tenant: tenant('inst-5', 'Nilgiri Mercantile Bank', '000903', 'PENDING', 'Kamal Uddin', 'kamal.uddin@nilgirimercantile.example') },
-    { ...blank, tenant: tenant('inst-6', 'Chandra Settlement Services', '042901', 'SUSPENDED', 'Mizanur Rahman', 'mizan@chandrasettlement.example'), configSaved: true, credential: { clientId: '042901-52d7c0aa' }, certificate: cert('CN=gateway.chandrasettlement.example', 150), signingKey: true },
-    { ...blank, tenant: tenant('inst-7', 'Doyel Co-operative Finance', '012901', 'TERMINATED', 'Farzana Akter', 'farzana@doyelfinance.example'), configSaved: true, credential: { clientId: '012901-9a08be37' }, certificate: cert('CN=gateway.doyelfinance.example', -40), signingKey: true },
+    { ...blank(), tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, certificate: cert('CN=gateway.shaplabank.example', 300), signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-1', ymd(year, 1), 0.5, 0.125), rateCard('inst-1', `${nextMonth()}-01`, 0.45, 0.12)] },
+    { ...blank(), tenant: tenant('inst-2', 'Karnaphuli Trust Bank', '000902', 'ACTIVE', 'Sabina Yasmin', 'sabina@karnaphulitrust.example'), configSaved: true, credential: { clientId: '000902-b40e5a11' }, certificate: cert('CN=gateway.karnaphulitrust.example', 12), signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-2', ymd(year, 1), 0.5, 0.125)] },
+    { ...blank(), tenant: tenant('inst-3', 'Teesta Digital Wallet', '022901', 'ACTIVE', 'Nusrat Jahan', 'nusrat@teestawallet.example', { gen: false, val: true }), configSaved: true, credential: { clientId: '022901-e93b6f48' }, certificate: cert('CN=gateway.teestawallet.example', 210), signingKey: true },
+    { ...blank(), tenant: tenant('inst-4', 'Surma Payments Ltd', '032901', 'PENDING', 'Jahid Hasan', 'jahid.hasan@surmapayments.example'), configSaved: true, credential: { clientId: '032901-3f9a1c20' } },
+    { ...blank(), tenant: tenant('inst-5', 'Nilgiri Mercantile Bank', '000903', 'PENDING', 'Kamal Uddin', 'kamal.uddin@nilgirimercantile.example') },
+    { ...blank(), tenant: tenant('inst-6', 'Chandra Settlement Services', '042901', 'SUSPENDED', 'Mizanur Rahman', 'mizan@chandrasettlement.example'), configSaved: true, credential: { clientId: '042901-52d7c0aa' }, certificate: cert('CN=gateway.chandrasettlement.example', 150), signingKey: true },
+    { ...blank(), tenant: tenant('inst-7', 'Doyel Co-operative Finance', '012901', 'TERMINATED', 'Farzana Akter', 'farzana@doyelfinance.example'), configSaved: true, credential: { clientId: '012901-9a08be37' }, certificate: cert('CN=gateway.doyelfinance.example', -40), signingKey: true },
   ]
 }
 
@@ -85,7 +112,18 @@ export class FakeBackend {
 
   /** Register another institution (e.g. one the directory picker should grey out). */
   addTenant(code: string, name: string, status = 'ACTIVE') {
-    this.records.unshift({ ...blank, tenant: tenant(`added-${code}`, name, code, status, 'Ops Desk', 'ops@example.test') })
+    this.records.unshift({ ...blank(), tenant: tenant(`added-${code}`, name, code, status, 'Ops Desk', 'ops@example.test') })
+  }
+
+  /** Seed a rate card directly into a tenant's list — tests use this to set up scenarios
+   *  without going through the HTTP path; the API endpoints are exercised separately. */
+  addRateCard(tenantId: string, effectiveFrom: string, generationRate: number, validationRate: number) {
+    const rec = this.find(tenantId)
+    if (!rec) throw new Error(`unknown tenant ${tenantId}`)
+    const card: RateCardDto = { rateCardId: newRateCardId(), tenantId, effectiveFrom, generationRate, validationRate, currency: 'BDT', createdBy: 'platform:admin' }
+    rec.rateCards.unshift(card)
+    rec.hasRateCard = true
+    return card
   }
 
   private statusOf(code: StepCode, r: Rec): StepStatus {
@@ -164,8 +202,12 @@ export class FakeBackend {
 
     if (pathname === '/v1/admin/institutions') return new Response(null, { status: 404 }) // the picker falls back to its built-in list
     if (pathname === '/v1/admin/tenants' && method === 'GET') {
-      const items = this.records.map((r) => this.dto(r))
-      return Response.json({ items, page: 1, pageSize: 100, totalCount: items.length, hasMore: false })
+      const params = new URL(url, 'http://fake').searchParams
+      const page = Number(params.get('page') ?? 1)
+      const pageSize = Number(params.get('pageSize') ?? 20)
+      const all = this.records.map((r) => this.dto(r))
+      const items = all.slice((page - 1) * pageSize, page * pageSize)
+      return Response.json({ items, page, pageSize, totalCount: all.length, hasMore: page * pageSize < all.length })
     }
     if (pathname === '/v1/admin/tenants' && method === 'POST') {
       if (this.records.some((r) => r.tenant.institutionCode === b.institutionCode)) return problem(409, 'Duplicate institution', 'An institution with this code is already registered.')
@@ -173,7 +215,7 @@ export class FakeBackend {
       const t = tenant(`new-${++this.counter}`, String(b.institutionName), code, 'PENDING', String(b.contactName), String(b.contactEmail))
       t.contactPhone = (b.contactPhone as string) ?? null
       t.address = (b.address as string) ?? null
-      this.records.unshift({ ...blank, tenant: t })
+      this.records.unshift({ ...blank(), tenant: t })
       return Response.json(this.dto(this.records[0]), { status: 201 })
     }
     if (pathname === '/v1/crypto-keys' && method === 'POST') {
@@ -181,6 +223,57 @@ export class FakeBackend {
       if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
       r.signingKey = true
       return Response.json({ tenantId: r.tenant.tenantId, status: 'ACTIVE' }, { status: 201 })
+    }
+
+    // Rate-cards endpoints (mirrors RateCardsController). The page fans GETs out per tenant,
+    // POST creates one for a future Dhaka month, DELETE withdraws while the month has not started.
+    if (pathname === '/v1/admin/billing/rate-cards' && method === 'GET') {
+      const params = new URL(url, 'http://fake').searchParams
+      const tenantId = params.get('tenantId') ?? ''
+      const r = this.find(tenantId)
+      if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
+      // Server already returns newest EffectiveFrom first; the seed keeps that order.
+      return Response.json(r.rateCards)
+    }
+    if (pathname === '/v1/admin/billing/rate-cards' && method === 'POST') {
+      const req = b as Partial<CreateRateCardDto>
+      const tenantId = String(req.tenantId ?? '')
+      const r = this.find(tenantId)
+      if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
+      const effectiveFrom = String(req.effectiveFrom ?? '')
+      // The server rejects an empty tenant, the wrong day, and a card present for that month.
+      if (r.rateCards.some((c) => c.effectiveFrom === effectiveFrom)) {
+        return problem(409, 'Rate card conflict', `tenant ${tenantId} already has a rate card for ${effectiveFrom.slice(0, 7)}.`)
+      }
+      const card: RateCardDto = {
+        rateCardId: newRateCardId(),
+        tenantId,
+        effectiveFrom,
+        generationRate: Number(req.generationRate),
+        validationRate: Number(req.validationRate),
+        currency: 'BDT',
+        createdBy: String(req.createdBy ?? 'platform:admin'),
+      }
+      r.rateCards.unshift(card)
+      r.hasRateCard = true
+      return Response.json(card, { status: 201 })
+    }
+    const rcDelete = pathname.match(/^\/v1\/admin\/billing\/rate-cards\/([^/]+)$/)
+    if (rcDelete && method === 'DELETE') {
+      const cardId = rcDelete[1]
+      for (const rec of this.records) {
+        const idx = rec.rateCards.findIndex((c) => c.rateCardId === cardId)
+        if (idx === -1) continue
+        const card = rec.rateCards[idx]
+        const today = ymd(new Date().getFullYear(), new Date().getMonth() + 1).slice(0, 7)
+        if (card.effectiveFrom.slice(0, 7) <= today) {
+          return problem(409, 'Rate card conflict', `rate card ${cardId} has already taken effect and cannot be withdrawn.`)
+        }
+        rec.rateCards.splice(idx, 1)
+        rec.hasRateCard = rec.rateCards.length > 0
+        return new Response(null, { status: 204 })
+      }
+      return problem(404, 'Rate card not found', `rate card ${cardId} does not exist.`)
     }
 
     const m = pathname.match(/^\/v1\/admin\/tenants\/([^/]+)(?:\/(.*))?$/)
@@ -252,6 +345,9 @@ export class FakeBackend {
   reset() {
     vi.unstubAllGlobals()
     resetApiClient()
+    this.records = seed()
+    this.calls = []
+    this.failures.clear()
   }
 }
 

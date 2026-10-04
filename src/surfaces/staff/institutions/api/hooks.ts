@@ -16,11 +16,20 @@ const base = '/v1/admin/tenants'
 
 // ------------------------------------------------------------------ reads
 
-/** The API caps a page at 100 tenants; the list filters client-side, so one page is enough for now. */
+/** The API caps a page at 100 tenants and the list filters client-side, so read every page. */
+export async function fetchAllTenants(): Promise<TenantDto[]> {
+  const tenants: TenantDto[] = []
+  for (let page = 1; ; page++) {
+    const result = await apiGet<PagedTenantDto>(`${base}?page=${page}&pageSize=100`)
+    tenants.push(...result.items)
+    if (!result.hasMore || result.items.length === 0) return tenants
+  }
+}
+
 export const useInstitutionList = () =>
   useQuery({
     queryKey: tenantsKey,
-    queryFn: async () => (await apiGet<PagedTenantDto>(`${base}?page=1&pageSize=100`)).items.map(toInstitution),
+    queryFn: async () => (await fetchAllTenants()).map(toInstitution),
   })
 
 const none: Institution[] = []

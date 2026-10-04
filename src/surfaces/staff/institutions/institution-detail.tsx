@@ -108,7 +108,7 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
           {inst.status === 'Suspended' && <Banner tone="warn" title="Suspended">This institution cannot generate or validate QR codes until it is reactivated.</Banner>}
           {inst.status === 'Active' && !inst.hasRateCard && (
             <Banner tone="warn" title="No rate card">
-              Usage is recorded but never billed until a rate card takes effect. Rate cards start on the 1st of a future month. <Link to="/staff/rates">Set a rate card</Link>.
+              Usage is recorded but never billed until a rate card takes effect. Rate cards start on the 1st of the current or a future month. <Link to="/staff/rates">Set a rate card</Link>.
             </Banner>
           )}
           {expiry !== null && expiry <= 30 && (

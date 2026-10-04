@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bdt, bdtRate, count, periodName } from '../../../shared/format'
-import { buildStatement, monthAfter, rateCardFor, type Statement } from '../../../shared/billing/billing'
+import { buildStatement, type Statement } from '../../../shared/billing/billing'
 import { useBilling } from '../../../shared/billing/store'
 import { StatementDrawer } from '../../../shared/billing/statement-drawer'
-import { Card, CardHeader, EmptyRow, StatusChip, Table, Td, Th, Tr } from '../../../shared/ui'
+import { Banner, Card, CardHeader, EmptyRow, StatusChip, Table, Td, Th, Tr } from '../../../shared/ui'
+import { useRateCards } from '../rates/api/hooks'
+import { cardFor, currentMonth } from '../rates/rates'
 
-/** One institution's billing: the statements it has received and the price its usage is charged at. Statements are still sample data; whether a rate card exists comes from the API. */
+/** One institution's billing: the statements it has received and the price its usage is charged at. Statements are still sample data; the rate card in the right-hand panel is the API's truth. */
 export function InstitutionBillingTab({ institutionId, institutionName, hasRateCard }: { institutionId: string; institutionName: string; hasRateCard: boolean }) {
   const billing = useBilling()
   const [selected, setSelected] = useState<Statement | null>(null)
@@ -14,9 +16,10 @@ export function InstitutionBillingTab({ institutionId, institutionName, hasRateC
     .reverse()
     .map((p) => buildStatement(billing, institutionId, p))
     .filter((s): s is Statement => s !== null)
-  // The card shown is the one charging usage right now, after the last closed month.
-  const effectMonth = monthAfter(billing.periods[billing.periods.length - 1])
-  const card = rateCardFor(billing.rateCards, institutionId, effectMonth)
+  // The in-effect card is the API's truth (was previously read from the legacy billing store,
+  // which only knew the seven seeded institutions).
+  const { items: cards, isPending, error } = useRateCards(institutionId)
+  const card = cardFor(cards, institutionId, currentMonth())
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -56,7 +59,13 @@ export function InstitutionBillingTab({ institutionId, institutionName, hasRateC
 
       <Card>
         <CardHeader title="Rate card in effect" />
-        {card ? (
+        {error ? (
+          <Banner tone="bad" title="Could not load the rate card">
+            Try again, or set a rate card from the Rates page.
+          </Banner>
+        ) : isPending ? (
+          <p className="p-5 text-text-2">Loading…</p>
+        ) : card ? (
           <dl className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-4 gap-y-3 p-5">
             <dt className="text-text-3">Effective</dt>
             <dd>{periodName(card.effectiveFrom.slice(0, 7))}</dd>
@@ -75,7 +84,7 @@ export function InstitutionBillingTab({ institutionId, institutionName, hasRateC
         ) : (
           <p className="p-5 text-text-3">
             <b className="block text-[15px] text-text">No rate card</b>
-            Usage is recorded but cannot be billed until a rate card takes effect. Rate cards start on the 1st of a future month.
+            Usage is recorded but cannot be billed until a rate card takes effect. Rate cards start on the 1st of the current or a future month.
           </p>
         )}
         <p className="border-t border-line px-5 py-3">

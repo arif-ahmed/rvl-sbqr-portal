@@ -1,16 +1,19 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import { errorMessage } from '../../../shared/api/client'
 import { bdtRate, periodName } from '../../../shared/format'
 import { Banner, Button, Card, ConfirmDialog, EmptyRow, StatusChip, Table, Td, Th, Tr, toast } from '../../../shared/ui'
 import { useInstitutions } from '../institutions/api/hooks'
+import { useAllRateCards, useWithdrawRateCard } from './api/hooks'
 import { NewRateCardDrawer } from './new-rate-card-drawer'
 import { canWithdraw, cardState, currentMonth, priceGaps, type Operation, type RateCard } from './rates'
-import { useRateCards, withdrawRateCard } from './store'
 
-/** Per-call prices for each institution. UI only: changes the in-memory store, nothing is sent to an API. */
+/** Per-call prices for each institution. Backed by the rate-cards API
+ *  (`GET /v1/admin/billing/rate-cards?tenantId=…` fanned out per Active institution). */
 export function RatesPage() {
   const institutions = useInstitutions()
-  const cards = useRateCards()
+  const { items: cards, error } = useAllRateCards()
+  const withdraw = useWithdrawRateCard()
   const [adding, setAdding] = useState(false)
   const [withdrawing, setWithdrawing] = useState<RateCard | null>(null)
   const name = (id: string) => institutions.find((i) => i.id === id)?.name ?? id
@@ -45,6 +48,8 @@ export function RatesPage() {
           <Plus className="size-4" aria-hidden /> New rate card
         </Button>
       </div>
+
+      {error && <Banner tone="bad" title="Could not load rate cards">{errorMessage(error)}</Banner>}
 
       {unpriced.length > 0 && (
         <Banner tone="info" title={`${unpriced.length} active ${unpriced.length === 1 ? 'institution has' : 'institutions have'} no rate card`}>
@@ -112,9 +117,15 @@ export function RatesPage() {
           confirmLabel="Withdraw"
           danger
           onConfirm={() => {
-            withdrawRateCard(withdrawing.id)
-            toast.success('Rate card withdrawn')
+            const card = withdrawing
             setWithdrawing(null)
+            withdraw.mutate(
+              { id: card.id, tenantId: card.institutionId },
+              {
+                onSuccess: () => toast.success('Rate card withdrawn'),
+                onError: (e) => toast.error(errorMessage(e, 'Could not withdraw the rate card.')),
+              },
+            )
           }}
         />
       )}
