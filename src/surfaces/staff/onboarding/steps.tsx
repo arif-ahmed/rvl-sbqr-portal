@@ -2,19 +2,19 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useState, type ReactNode } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
-import { bdtRate, periodName } from '../../../shared/format'
+import type { Blocker } from '../../../shared/api/client'
 import { Banner, Button, Card, Field, Input, Select, StatusChip, SwitchRow, Textarea } from '../../../shared/ui'
+import { useInstitutions } from '../institutions/api/hooks'
+import type { OnboardingDto } from '../institutions/api/types'
 import { certSchema } from '../institutions/schemas'
-import { takenCodes } from '../institutions/store'
-import type { Access, Certificate, KeyMode, Profile } from '../institutions/types'
+import type { Certificate, KeyMode, Profile } from '../institutions/types'
 import { InstitutionPicker } from './institution-picker'
 import { type RegistryEntry } from './institution-registry'
 import { institutionCode, institutionTypes, typeLabel } from './institution-types'
 import { useInstitutionDirectory } from './use-institution-directory'
-import { price, type RateCard } from '../rates/rates'
 
-// UI-only for now: nothing here calls the API.
-
+// The wizard steps. Each one is a plain form: the page owns the requests (see onboarding-page.tsx)
+// and hands every step its `busy` / `error` state, so a step only decides what to show.
 
 function StepCard({ title, text, children }: { title: string; text: string; children: ReactNode }) {
   return (
@@ -32,6 +32,13 @@ function Actions({ children }: { children: ReactNode }) {
   return <div className="mt-2 flex flex-wrap justify-end gap-2.5 border-t border-line pt-4">{children}</div>
 }
 
+/** A failed request, shown above the step's buttons. */
+function StepError({ error }: { error: string | null | undefined }) {
+  return error ? <Banner tone="bad" title="That didn’t work">{error}</Banner> : null
+}
+
+type StepState = { busy?: boolean; error?: string | null }
+
 // ---------------------------------------------------------------- 1. Institution
 
 const profileSchema = z.object({
@@ -44,14 +51,16 @@ const profileSchema = z.object({
   address: z.string().trim().max(300, 'Use 300 characters or fewer.'),
 })
 
-export function InstitutionStep(props: { initial: Profile | null; locked: boolean; onSubmit: (p: Profile) => void }) {
-  const { initial, locked, onSubmit } = props
+export function InstitutionStep(props: StepState & { initial: Profile | null; locked: boolean; onSubmit: (p: Profile) => void }) {
+  const { initial, locked, onSubmit, busy, error } = props
   const form = useForm<Profile>({
     resolver: zodResolver(profileSchema),
     defaultValues: initial ?? { name: '', type: '', institutionId: '', contactName: '', email: '', phone: '', address: '' },
   })
   const { errors } = form.formState
   const [type, institutionId] = useWatch({ control: form.control, name: ['type', 'institutionId'] })
+  // Codes already registered: the picker greys them out. The API still refuses a duplicate with a 409.
+  const taken = useInstitutions().map((i) => i.code)
 
   // The name is fixed by the regulator, so it is picked from the directory rather than typed.
   // "Not listed" falls back to manual entry (also the only way to add an NBFI).
@@ -71,7 +80,7 @@ export function InstitutionStep(props: { initial: Profile | null; locked: boolea
 
   function submit(p: Profile) {
     if (locked) return onSubmit(p)
-    if (takenCodes().includes(institutionCode(p.type, p.institutionId))) {
+    if (taken.includes(institutionCode(p.type, p.institutionId))) {
       form.setError('institutionId', { message: 'This institution code is already registered.' })
       return
     }
@@ -130,7 +139,7 @@ export function InstitutionStep(props: { initial: Profile | null; locked: boolea
                 disabled={locked}
                 invalid={!!(errors.name || errors.institutionId)}
                 entries={directory.entries}
-                taken={takenCodes()}
+                taken={taken}
                 frozen={directory.frozen}
                 onChange={(e) => {
                   setPicked(e)
@@ -168,9 +177,10 @@ export function InstitutionStep(props: { initial: Profile | null; locked: boolea
             <Textarea id="address" className="min-h-20" {...form.register('address')} />
           </Field>
         </fieldset>
+        <StepError error={error} />
         <Actions>
-          <Button type="submit" variant="primary">
-            {locked ? 'Continue' : 'Register institution'}
+          <Button type="submit" variant="primary" disabled={busy}>
+            {locked ? 'Continue' : busy ? 'Registering…' : 'Register institution'}
           </Button>
         </Actions>
       </form>
@@ -181,29 +191,33 @@ export function InstitutionStep(props: { initial: Profile | null; locked: boolea
 // ---------------------------------------------------------------- 2. Configuration
 
 /**
- * What the institution may do. The capabilities chosen here scope the credentials issued near
- * the end of the wizard, and the switches stay editable even after issuance — a change then
- * applies to the issued credentials right away (no new secret), like the institution page does.
+ * What the institution may do. The capabilities chosen here scope the credentials issued on the
+ * next step. Once credentials exist the API no longer accepts a change here (the credentials are
+ * already scoped), so the switches lock.
  */
-export function ConfigurationStep(props: {
-  generation: boolean
-  validation: boolean
-  issuedClientId: string | null
-  onChange: (kind: 'generation' | 'validation', value: boolean) => void
-  onBack: () => void
-  onContinue: () => void
-}) {
-  const { generation, validation, issuedClientId, onChange, onBack, onContinue } = props
+export function ConfigurationStep(
+  props: StepState & {
+    generation: boolean
+    validation: boolean
+    /** Credentials already exist, so the capabilities are fixed. */
+    locked: boolean
+    onChange: (kind: 'generation' | 'validation', value: boolean) => void
+    onBack: () => void
+    onContinue: () => void
+  },
+) {
+  const { generation, validation, locked, busy, error, onChange, onBack, onContinue } = props
   const none = !generation && !validation
 
   return (
-    <StepCard title="Tenant configuration" text="Choose what this institution may do. The API credentials issued later in this wizard are scoped to exactly these capabilities.">
+    <StepCard title="Tenant configuration" text="Choose what this institution may do. The API credentials issued on the next step are scoped to exactly these capabilities.">
       <div className="mb-4 flex flex-col gap-3">
         <SwitchRow
           id="generation"
           label="QR generation"
           description="Create Secure Bangla QR codes (scope qr:generate)."
           checked={generation}
+          disabled={locked}
           onChange={(v) => onChange('generation', v)}
         />
         <SwitchRow
@@ -211,56 +225,96 @@ export function ConfigurationStep(props: {
           label="QR validation"
           description="Verify Secure Bangla QR codes (scope qr:validate)."
           checked={validation}
+          disabled={locked}
           onChange={(v) => onChange('validation', v)}
         />
       </div>
       {none && <Banner tone="warn" title="Turn on at least one capability.">Credentials with neither capability could not be used.</Banner>}
-      {issuedClientId && (
+      {locked && (
         <Banner tone="info" title="Credentials already issued">
-          Client ID <span className="num">{issuedClientId}</span>. Changes here apply to the issued credentials right away —
-          no new secret is needed.
+          The credentials are scoped to these capabilities, so they can no longer be changed here.
         </Banner>
       )}
+      <StepError error={error} />
       <Actions>
         <Button onClick={onBack}>Back</Button>
-        <Button variant="primary" disabled={none} onClick={onContinue}>
-          Continue
+        <Button variant="primary" disabled={none || busy} onClick={onContinue}>
+          {busy ? 'Saving…' : 'Continue'}
         </Button>
       </Actions>
     </StepCard>
   )
 }
 
-// ---------------------------------------------------------------- 3. Rate card
+// ---------------------------------------------------------------- 3. API credentials
 
-const rateStepSchema = z.object({ generationRate: price, validationRate: price })
-type RateStepForm = z.infer<typeof rateStepSchema>
+/** The issuance ceremony: explains what will be generated, issues the pair, then confirms it. */
+export function CredentialsStep(
+  props: StepState & {
+    capabilities: { generation: boolean; validation: boolean }
+    /** The active credential, if one was issued. Its secret is never available here. */
+    issued: NonNullable<OnboardingDto['credential']> | null
+    onBack: () => void
+    onIssue: () => void
+    onContinue: () => void
+  },
+) {
+  const { capabilities, issued, busy, error, onBack, onIssue, onContinue } = props
+  const caps = [capabilities.generation && 'QR generation', capabilities.validation && 'QR validation'].filter(Boolean).join(' and ')
 
-/**
- * What the institution pays per call. Required: an institution cannot be activated without a
- * card in effect, so the card starts the month the institution goes live. A started card never
- * changes — repricing for later months is scheduled from the Rates page.
- */
-export function RateCardStep(props: {
-  capabilities: { generation: boolean; validation: boolean }
-  /** The card in effect for the start month, if one exists. */
-  card: RateCard | null
-  /** 'YYYY-MM' the new card starts — the current month. */
-  startMonth: string
-  onBack: () => void
-  onContinue: () => void
-  onSave: (generationRate: number, validationRate: number) => void
-}) {
-  const { capabilities, card, startMonth, onBack, onContinue, onSave } = props
-  const form = useForm<RateStepForm>({ resolver: zodResolver(rateStepSchema), defaultValues: { generationRate: '', validationRate: '' } })
+  return (
+    <StepCard title="API credentials" text="Issue the client ID and client secret the institution's gateway will use to connect.">
+      <div className="mb-4 rounded-xl border border-line px-4 py-3.5">
+        <b className="block">Scoped to {caps}</b>
+        <span className="text-[13px] text-text-3">Set on the Configuration step{issued ? '' : ' — go back to change it before issuing'}.</span>
+      </div>
+      <Banner tone="info" title="What issuing generates">
+        A client ID identifies the institution in every API request. A client secret authenticates its gateway and is shown
+        only once — only a hash is kept, so copy it when it appears.
+      </Banner>
+      {issued && (
+        <Banner tone="ok" title="Credentials issued">
+          Client ID <span className="num">{issued.clientId}</span>. The secret was shown once and cannot be shown again.
+        </Banner>
+      )}
+      <StepError error={error} />
+      <Actions>
+        <Button onClick={onBack}>Back</Button>
+        {issued ? (
+          <Button variant="primary" onClick={onContinue}>
+            Continue
+          </Button>
+        ) : (
+          <Button variant="primary" disabled={busy} onClick={onIssue}>
+            {busy ? 'Issuing…' : 'Issue credentials'}
+          </Button>
+        )}
+      </Actions>
+    </StepCard>
+  )
+}
+
+// ---------------------------------------------------------------- 4. Certificate
+
+export function CertificateStep(
+  props: StepState & {
+    /** The certificate already registered, if any. */
+    registered: OnboardingDto['certificate']
+    onBack: () => void
+    onSkip: () => void
+    onContinue: () => void
+    onSubmit: (c: Certificate) => void
+  },
+) {
+  const { registered, busy, error, onBack, onSkip, onContinue, onSubmit } = props
+  const form = useForm<Certificate>({ resolver: zodResolver(certSchema), defaultValues: { thumbprint: '', subject: '', expiresAt: '' } })
   const { errors } = form.formState
 
-  if (card) {
+  if (registered) {
     return (
-      <StepCard title="Rate card" text="What the institution is charged per billable call.">
-        <Banner tone="ok" title="Rate card in effect">
-          Since {periodName(card.effectiveFrom.slice(0, 7))}: {bdtRate(card.generationRate)} per generation and {bdtRate(card.validationRate)} per validation. A
-          started card cannot be changed — schedule a new one for a future month from the Rates page.
+      <StepCard title="Client certificate" text="mTLS certificate for the FI gateway connection.">
+        <Banner tone="ok" title="Certificate registered">
+          {registered.subject}, expires {registered.expiresAt.slice(0, 10)}. Replace it later from the institution page.
         </Banner>
         <Actions>
           <Button onClick={onBack}>Back</Button>
@@ -271,50 +325,6 @@ export function RateCardStep(props: {
       </StepCard>
     )
   }
-
-  return (
-    <StepCard title="Rate card" text="Set the per-call prices the institution is charged. It cannot be activated without them.">
-      <form onSubmit={form.handleSubmit((v) => onSave(Number(v.generationRate), Number(v.validationRate)))} noValidate>
-        <Banner tone="info" title={`Billing starts ${periodName(startMonth)}`}>
-          The card takes effect on the 1st of {periodName(startMonth)} — the month the institution goes live — and prices every billable call:
-          static and dynamic generation cost the same. Zero is allowed for a capability that should be free. Later price changes are
-          scheduled from the Rates page; a started card never changes.
-        </Banner>
-        <div className="grid gap-x-4 sm:grid-cols-2">
-          <Field
-            label="Generation price per call (BDT)"
-            htmlFor="rate-generation"
-            error={errors.generationRate?.message}
-            hint={capabilities.generation ? 'Static and dynamic QR codes cost the same.' : 'Not used while generation is off. Kept in case it is enabled later.'}
-          >
-            <Input id="rate-generation" inputMode="decimal" autoComplete="off" placeholder="0.50" className="num" aria-invalid={!!errors.generationRate} {...form.register('generationRate')} />
-          </Field>
-          <Field
-            label="Validation price per call (BDT)"
-            htmlFor="rate-validation"
-            error={errors.validationRate?.message}
-            hint={capabilities.validation ? 'Up to 4 decimals. Zero is allowed.' : 'Not used while validation is off. Kept in case it is enabled later.'}
-          >
-            <Input id="rate-validation" inputMode="decimal" autoComplete="off" placeholder="0.125" className="num" aria-invalid={!!errors.validationRate} {...form.register('validationRate')} />
-          </Field>
-        </div>
-        <Actions>
-          <Button onClick={onBack}>Back</Button>
-          <Button type="submit" variant="primary">
-            Save rate card
-          </Button>
-        </Actions>
-      </form>
-    </StepCard>
-  )
-}
-
-// ---------------------------------------------------------------- 4. Certificate
-
-export function CertificateStep(props: { initial: Certificate | null; onBack: () => void; onSkip: () => void; onSubmit: (c: Certificate) => void }) {
-  const { initial, onBack, onSkip, onSubmit } = props
-  const form = useForm<Certificate>({ resolver: zodResolver(certSchema), defaultValues: initial ?? { thumbprint: '', subject: '', expiresAt: '' } })
-  const { errors } = form.formState
 
   return (
     <StepCard title="Client certificate" text="mTLS certificate for the FI gateway connection. Add it now or later from the institution page.">
@@ -330,11 +340,14 @@ export function CertificateStep(props: { initial: Certificate | null; onBack: ()
             <Input id="expiresAt" type="date" aria-invalid={!!errors.expiresAt} {...form.register('expiresAt')} />
           </Field>
         </div>
+        <StepError error={error} />
         <Actions>
           <Button onClick={onBack}>Back</Button>
-          <Button onClick={onSkip}>Skip for now</Button>
-          <Button type="submit" variant="primary">
-            Register certificate
+          <Button disabled={busy} onClick={onSkip}>
+            Skip for now
+          </Button>
+          <Button type="submit" variant="primary" disabled={busy}>
+            {busy ? 'Registering…' : 'Register certificate'}
           </Button>
         </Actions>
       </form>
@@ -346,19 +359,46 @@ export function CertificateStep(props: { initial: Certificate | null; onBack: ()
 
 const pemSchema = z.string().refine((v) => /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----/.test(v.trim()), 'Paste a PEM private key.')
 
-export function KeyStep(props: { initial: KeyMode | null; onBack: () => void; onSkip: () => void; onSubmit: (m: KeyMode) => void }) {
-  const { initial, onBack, onSkip, onSubmit } = props
-  const [mode, setMode] = useState<KeyMode>(initial ?? 'Generate')
+/** Required: an institution cannot go live without an active signing key. */
+export function KeyStep(
+  props: StepState & {
+    /** The active key, if one exists. */
+    existing: OnboardingDto['signingKey']
+    onBack: () => void
+    onContinue: () => void
+    onSubmit: (mode: KeyMode, privateKeyPem?: string) => void
+  },
+) {
+  const { existing, busy, error, onBack, onContinue, onSubmit } = props
+  const [mode, setMode] = useState<KeyMode>('Generate')
   const [pem, setPem] = useState('')
-  const [error, setError] = useState('')
+  const [invalid, setInvalid] = useState('')
+
+  if (existing) {
+    return (
+      <StepCard title="Signing key" text="Ed25519 key used to sign this institution's QR codes.">
+        <Banner tone="ok" title="Signing key active">
+          Key <span className="num">{existing.keyId}</span>, version {existing.version}.
+        </Banner>
+        <Actions>
+          <Button onClick={onBack}>Back</Button>
+          <Button variant="primary" onClick={onContinue}>
+            Continue
+          </Button>
+        </Actions>
+      </StepCard>
+    )
+  }
 
   function submit() {
     if (mode === 'Adopt') {
       const r = pemSchema.safeParse(pem)
-      if (!r.success) return setError(r.error.issues[0].message)
+      if (!r.success) return setInvalid(r.error.issues[0].message)
+      // The pasted key is sent once and dropped here: it is not kept in state, storage or logs.
+      const key = pem
+      setPem('')
+      return onSubmit(mode, key)
     }
-    // The pasted key is never kept: it is dropped here and would go straight to the API.
-    setPem('')
     onSubmit(mode)
   }
 
@@ -373,7 +413,7 @@ export function KeyStep(props: { initial: KeyMode | null; onBack: () => void; on
             aria-checked={mode === m}
             onClick={() => {
               setMode(m)
-              setError('')
+              setInvalid('')
             }}
             className={`rounded-xl border p-4 text-left ${mode === m ? 'border-accent bg-accent-soft' : 'border-line hover:bg-surface-2'}`}
           >
@@ -385,63 +425,16 @@ export function KeyStep(props: { initial: KeyMode | null; onBack: () => void; on
         ))}
       </div>
       {mode === 'Adopt' && (
-        <Field label="Private key (PEM)" htmlFor="pem" error={error} hint="The matching public key must already be in the trust directory.">
-          <Textarea id="pem" className="num min-h-36 text-xs" spellCheck={false} aria-invalid={!!error} value={pem} onChange={(e) => setPem(e.target.value)} />
+        <Field label="Private key (PEM)" htmlFor="pem" error={invalid} hint="The matching public key must already be in the trust directory.">
+          <Textarea id="pem" className="num min-h-36 text-xs" spellCheck={false} aria-invalid={!!invalid} value={pem} onChange={(e) => setPem(e.target.value)} />
         </Field>
       )}
+      <StepError error={error} />
       <Actions>
         <Button onClick={onBack}>Back</Button>
-        <Button onClick={onSkip}>Skip for now</Button>
-        <Button variant="primary" onClick={submit}>
-          {mode === 'Generate' ? 'Create key' : 'Use this key'}
+        <Button variant="primary" disabled={busy} onClick={submit}>
+          {busy ? 'Working…' : mode === 'Generate' ? 'Create key' : 'Use this key'}
         </Button>
-      </Actions>
-    </StepCard>
-  )
-}
-
-// ---------------------------------------------------------------- 6. API credentials
-
-/** The issuance ceremony: explains what will be generated, issues the pair, then confirms it. */
-export function CredentialsStep(props: {
-  capabilities: { generation: boolean; validation: boolean }
-  access: Access | null
-  onBack: () => void
-  onIssue: () => void
-  onContinue: () => void
-}) {
-  const { capabilities, access, onBack, onIssue, onContinue } = props
-  const issued = !!access?.clientId
-  const caps = [capabilities.generation && 'QR generation', capabilities.validation && 'QR validation'].filter(Boolean).join(' and ')
-
-  return (
-    <StepCard title="API credentials" text="Issue the client ID and client secret the institution's gateway will use to connect.">
-      <div className="mb-4 rounded-xl border border-line px-4 py-3.5">
-        <b className="block">Scoped to {caps}</b>
-        <span className="text-[12.5px] text-text-3">Set on the Configuration step{issued ? '' : ' — go back to change it before issuing'}.</span>
-      </div>
-      <Banner tone="info" title="What issuing generates">
-        A client ID identifies the institution in every API request. A client secret authenticates its gateway and is shown
-        only once — only a hash is kept, so copy it when it appears. Both can be rotated or regenerated later from the
-        institution page.
-      </Banner>
-      {issued && (
-        <Banner tone="ok" title="Credentials issued">
-          Client ID <span className="num">{access.clientId}</span>. The secret was shown once and cannot be shown again.
-          Capabilities can be changed from the Configuration step or later from the institution page.
-        </Banner>
-      )}
-      <Actions>
-        <Button onClick={onBack}>Back</Button>
-        {issued ? (
-          <Button variant="primary" onClick={onContinue}>
-            Continue
-          </Button>
-        ) : (
-          <Button variant="primary" onClick={onIssue}>
-            Issue credentials
-          </Button>
-        )}
       </Actions>
     </StepCard>
   )
@@ -461,18 +454,41 @@ function Row({ label, value, state }: { label: string; value: string; state: 'do
   )
 }
 
-export function ReviewStep(props: {
-  profile: Profile
-  access: Access
-  rate: RateCard | null
-  certificate: Certificate | null
-  keyMode: KeyMode | null
-  keyApplies: boolean
-  onBack: () => void
-  onFinish: (activate: boolean) => void
-}) {
-  const { profile, access, rate, certificate, onBack, onFinish } = props
-  const caps = [access.generation && 'generation', access.validation && 'validation'].filter(Boolean).join(' and ')
+/** What stops activation, in the API's words. `TRUST_ENTRY_MISSING` needs a pointer: the wizard cannot fix it. */
+function Blockers({ blockers }: { blockers: Blocker[] }) {
+  if (blockers.length === 0) return null
+  return (
+    <Banner tone="warn" title="Not ready to activate yet">
+      <ul className="list-disc pl-4">
+        {blockers.map((b) => (
+          <li key={b.code}>
+            {b.message}
+            {b.code === 'TRUST_ENTRY_MISSING' && ' This institution must be published in the Bangladesh Bank trust directory before it can go live.'}
+          </li>
+        ))}
+      </ul>
+    </Banner>
+  )
+}
+
+export function ReviewStep(
+  props: StepState & {
+    profile: Profile
+    onboarding: OnboardingDto | undefined
+    /** Blockers from a refused activation (fresher than the last onboarding read). */
+    refusal: Blocker[]
+    onBack: () => void
+    onFinishLater: () => void
+    onActivate: () => void
+  },
+) {
+  const { profile, onboarding, refusal, busy, error, onBack, onFinishLater, onActivate } = props
+  const config = onboarding?.configuration
+  const caps = config ? [config.isQrGenerationAllowed && 'generation', config.isQrValidationAllowed && 'validation'].filter(Boolean).join(' and ') : ''
+  const certificate = onboarding?.certificate
+  const skipped = onboarding?.steps.find((s) => s.code === 'CERTIFICATE')?.status === 'SKIPPED'
+  const blockers = refusal.length > 0 ? refusal : (onboarding?.blockers ?? [])
+
   return (
     <StepCard title="Review and activate" text="Check the setup. Activating makes the institution live; otherwise it stays Pending.">
       <div className="mb-4">
@@ -484,25 +500,30 @@ export function ReviewStep(props: {
           {typeLabel(profile.type)} · code <span className="num">{institutionCode(profile.type, profile.institutionId)}</span> · {profile.contactName}, {profile.email}
         </span>
       </div>
-      <Row label="Capabilities" value={caps} state="done" />
-      <Row label="API credentials" value={access.clientId ? `Client ID ${access.clientId}` : 'Not issued'} state={access.clientId ? 'done' : 'todo'} />
+      <Row label="Capabilities" value={caps || 'Not set'} state={caps ? 'done' : 'todo'} />
+      <Row label="API credentials" value={onboarding?.credential ? `Client ID ${onboarding.credential.clientId}` : 'Not issued'} state={onboarding?.credential ? 'done' : 'todo'} />
       <Row
-        label="Rate card"
-        value={rate ? `${bdtRate(rate.generationRate)} per generation · ${bdtRate(rate.validationRate)} per validation, since ${periodName(rate.effectiveFrom.slice(0, 7))}` : 'Not set'}
-        state={rate ? 'done' : 'todo'}
+        label="Client certificate"
+        value={certificate ? `${certificate.subject}, expires ${certificate.expiresAt.slice(0, 10)}` : skipped ? 'Skipped for now' : 'Not added yet'}
+        state={certificate || skipped ? 'done' : 'todo'}
       />
-      <Row label="Client certificate" value={certificate ? `${certificate.subject}, expires ${certificate.expiresAt}` : 'Not added yet'} state={certificate ? 'done' : 'todo'} />
-      {props.keyApplies && <Row label="Signing key" value={props.keyMode ? (props.keyMode === 'Generate' ? 'Generated by the platform' : 'Existing key provided') : 'Not created yet'} state={props.keyMode ? 'done' : 'todo'} />}
-      {!rate && (
-        <Banner tone="warn" title="Rate card required">
-          Set prices on the Rate card step before activating — usage without a card in effect is recorded but never billed.
+      <Row
+        label="Signing key"
+        value={onboarding?.signingKey ? `Key ${onboarding.signingKey.keyId}, version ${onboarding.signingKey.version}` : 'Not created yet'}
+        state={onboarding?.signingKey ? 'done' : 'todo'}
+      />
+      <Blockers blockers={blockers} />
+      {onboarding && !onboarding.hasRateCard && (
+        <Banner tone="info" title="No rate card yet">
+          You can activate without one, but usage is recorded and never billed until a rate card takes effect. Rate cards start on the 1st of a future month and are set from Rates.
         </Banner>
       )}
+      <StepError error={error} />
       <Actions>
         <Button onClick={onBack}>Back</Button>
-        <Button onClick={() => onFinish(false)}>Finish later</Button>
-        <Button variant="primary" disabled={!rate} onClick={() => onFinish(true)}>
-          Activate institution
+        <Button onClick={onFinishLater}>Finish later</Button>
+        <Button variant="primary" disabled={busy || !onboarding?.canActivate} onClick={onActivate}>
+          {busy ? 'Activating…' : 'Activate institution'}
         </Button>
       </Actions>
     </StepCard>

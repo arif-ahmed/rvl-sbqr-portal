@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apiGet, authenticate, resetApiClient } from './client'
+import { ApiError, apiGet, apiSend, authenticate, errorMessage, resetApiClient } from './client'
 
 /** Minimal unsigned JWT — only the payload segment is decoded. */
 const jwt = (payload: object) => `h.${btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.s`
@@ -116,5 +116,61 @@ describe('apiGet', () => {
 
   it('refuses calls before sign-in', async () => {
     await expect(apiGet('/v1/things')).rejects.toThrow('Not signed in.')
+  })
+})
+
+describe('apiSend', () => {
+  async function signedIn(handler: (url: string, init?: RequestInit) => Response) {
+    const fetchMock = stubFetch((url, init) =>
+      url.endsWith('/v1/oauth/token') ? Response.json({ accessToken: adminToken, tokenType: 'Bearer', expiresIn: 600 }) : handler(url, init),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await authenticate('platform-bootstrap', 'secret')
+    return fetchMock
+  }
+
+  it('sends a JSON body with the bearer token and parses the response', async () => {
+    const fetchMock = await signedIn(() => Response.json({ tenantId: 't1' }, { status: 201 }))
+    await expect(apiSend('POST', '/v1/admin/tenants', { institutionName: 'X' })).resolves.toEqual({ tenantId: 't1' })
+    const [, init] = fetchMock.mock.calls[1]
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBe(JSON.stringify({ institutionName: 'X' }))
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' })
+  })
+
+  it('resolves to undefined on 204 and sends no body when none is given', async () => {
+    const fetchMock = await signedIn(() => new Response(null, { status: 204 }))
+    await expect(apiSend('DELETE', '/v1/admin/tenants/t1/client-certificate')).resolves.toBeUndefined()
+    const [, init] = fetchMock.mock.calls[1]
+    expect(init?.body).toBeUndefined()
+    expect(init?.headers).not.toHaveProperty('Content-Type')
+  })
+
+  it('throws an ApiError carrying the problem details and blockers', async () => {
+    await signedIn(() =>
+      Response.json(
+        { title: 'Invariant violation', detail: 'Tenant cannot be activated.', blockers: [{ code: 'CREDENTIAL_MISSING', message: 'No active API credential.' }, { bad: true }] },
+        { status: 409 },
+      ),
+    )
+    const error = await apiSend('POST', '/v1/admin/tenants/t1/activate').catch((e) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 409, title: 'Invariant violation', detail: 'Tenant cannot be activated.', message: 'POST /v1/admin/tenants/t1/activate failed: 409' })
+    expect(error.blockers).toEqual([{ code: 'CREDENTIAL_MISSING', message: 'No active API credential.' }])
+    expect(errorMessage(error)).toBe('Tenant cannot be activated.')
+  })
+
+  it('copes with an error body that is not JSON', async () => {
+    await signedIn(() => new Response('upstream down', { status: 502 }))
+    const error = await apiGet('/v1/things').catch((e) => e)
+    expect(error).toMatchObject({ status: 502, title: null, detail: null, blockers: [] })
+    expect(errorMessage(error, 'fallback')).toBe('fallback')
+  })
+
+  it('re-mints once and retries a write on 401', async () => {
+    let calls = 0
+    await signedIn(() => (++calls === 1 ? new Response(null, { status: 401 }) : Response.json({ ok: true })))
+    await expect(apiSend('PATCH', '/v1/admin/tenants/t1/configuration', { isQrGenerationAllowed: true })).resolves.toEqual({ ok: true })
+    expect(calls).toBe(2)
   })
 })

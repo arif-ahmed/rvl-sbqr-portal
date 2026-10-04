@@ -1,99 +1,180 @@
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Stepper, type StepDef } from '../../../shared/ui'
-import { demoCredentials } from '../institutions/credentials'
-import { addInstitution, getInstitutions, patchInstitution } from '../institutions/store'
-import type { Access, Certificate, Institution, KeyMode, Profile } from '../institutions/types'
-import { cardFor, currentMonth } from '../rates/rates'
-import { addRateCard, useRateCards } from '../rates/store'
+import { ApiError, errorMessage, type Blocker } from '../../../shared/api/client'
+import { Banner, Button, Card, Stepper, toast, type StepDef } from '../../../shared/ui'
+import {
+  useCreateSigningKey,
+  useInstitution,
+  useOnboarding,
+  useProvisionCredentials,
+  useRegisterCertificate,
+  useRegisterTenant,
+  useSaveConfiguration,
+  useSkipCertificate,
+  useTenantAction,
+} from '../institutions/api/hooks'
+import { stepLabels, stepStatus, toProfile } from '../institutions/api/mappers'
+import { stepOrder, type StepCode } from '../institutions/api/types'
+import type { Institution, Profile } from '../institutions/types'
 import { institutionCode } from './institution-types'
 import { SecretDialog } from './secret-dialog'
-import { CertificateStep, ConfigurationStep, CredentialsStep, InstitutionStep, KeyStep, RateCardStep, ReviewStep } from './steps'
+import { CertificateStep, ConfigurationStep, CredentialsStep, InstitutionStep, KeyStep, ReviewStep } from './steps'
 
-// Institution onboarding. UI only: each step saves to the in-memory store (like the API will
-// commit each step) and no request is sent. Reached from "Add institution", or with
-// ?resume=<id> from "Continue setup" on a Pending institution.
+// Institution onboarding. Every step saves to the API as it completes, so closing the tab loses
+// nothing: `?resume=<tenantId>` (from "Continue setup" on a Pending institution) reads the
+// institution's onboarding progress and opens at the first step that is not done.
+// Reached from "Add institution".
 
-type StepId = 'institution' | 'configuration' | 'rate' | 'certificate' | 'key' | 'credentials' | 'review'
+const steps: (StepDef & { id: StepCode })[] = stepOrder.map((id) => ({ id, label: stepLabels[id], optional: id === 'CERTIFICATE' }))
 
-const toProfile = (i: Institution): Profile => ({
-  name: i.name, type: i.type, institutionId: i.code.slice(2), contactName: i.contactName, email: i.email, phone: i.phone, address: i.address,
-})
-
-function firstIncomplete(i: Institution, carded: boolean): StepId {
-  if (!i.access) return 'configuration'
-  if (!carded) return 'rate'
-  if (!i.certificate) return 'certificate'
-  if (i.access.generation && !i.keyMode) return 'key'
-  return 'review'
-}
+/** Where a resumed wizard starts, read once so later refetches never move the user around. */
+type Start = { existing: Institution; step: StepCode; capabilities: { generation: boolean; validation: boolean } }
 
 export default function OnboardingPage() {
   const [params] = useSearchParams()
   const resumeId = params.get('resume')
-  // Read once: later edits to the store must not move the user around.
-  const [existing] = useState(() => (resumeId ? (getInstitutions().find((i) => i.id === resumeId) ?? null) : null))
-
-  if (resumeId && existing?.status !== 'Pending') return <Navigate to="/staff/institutions" replace />
-  return <Onboarding existing={existing} />
+  return resumeId ? <Resume key={resumeId} id={resumeId} /> : <Onboarding existing={null} startStep="PROFILE" capabilities={{ generation: true, validation: true }} />
 }
 
-function Onboarding({ existing }: { existing: Institution | null }) {
+function Resume({ id }: { id: string }) {
+  const institution = useInstitution(id)
+  const onboarding = useOnboarding(id)
+  const [start, setStart] = useState<Start | null>(null)
+  // Captured once: activating the institution later must not bounce this screen back to the list.
+  if (!start && institution.data && onboarding.data) {
+    const config = onboarding.data.configuration
+    setStart({
+      existing: institution.data,
+      step: onboarding.data.currentStep ?? 'REVIEW',
+      capabilities: { generation: config?.isQrGenerationAllowed ?? true, validation: config?.isQrValidationAllowed ?? true },
+    })
+  }
+
+  const failure = institution.error ?? onboarding.error
+  if (failure instanceof ApiError && failure.status === 404) return <Navigate to="/staff/institutions" replace />
+  if (failure && !start) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Banner tone="bad" title="Could not load this institution">
+          {errorMessage(failure)} <Link to="/staff/institutions">Back to institutions</Link>
+        </Banner>
+      </div>
+    )
+  }
+  if (!start) return <p className="text-text-2">Loading…</p>
+  if (start.existing.status !== 'Pending') return <Navigate to="/staff/institutions" replace />
+  return <Onboarding existing={start.existing} startStep={start.step} capabilities={start.capabilities} />
+}
+
+function Onboarding({ existing, startStep, capabilities }: { existing: Institution | null; startStep: StepCode; capabilities: { generation: boolean; validation: boolean } }) {
   const navigate = useNavigate()
-  const rateCards = useRateCards()
-  const [recordId, setRecordId] = useState<string | null>(existing?.id ?? null)
-  const [stepId, setStepId] = useState<StepId>(existing ? firstIncomplete(existing, !!cardFor(rateCards, existing.id, currentMonth())) : 'institution')
+  const [tenantId, setTenantId] = useState<string | null>(existing?.id ?? null)
+  const [stepId, setStepId] = useState<StepCode>(startStep)
   const [profile, setProfile] = useState<Profile | null>(existing ? toProfile(existing) : null)
-  const [config, setConfig] = useState<{ generation: boolean; validation: boolean }>(
-    existing?.access ? { generation: existing.access.generation, validation: existing.access.validation } : { generation: true, validation: true },
-  )
-  const [access, setAccess] = useState<Access | null>(existing?.access ?? null)
-  const [certificate, setCertificate] = useState<Certificate | null>(existing?.certificate ?? null)
-  const [keyMode, setKeyMode] = useState<KeyMode | null>(existing?.keyMode ?? null)
+  const [config, setConfig] = useState(capabilities)
   const [shownSecret, setShownSecret] = useState<{ clientId: string; secret: string } | null>(null)
   const [result, setResult] = useState<'Active' | 'Pending' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<Blocker[]>([])
 
-  // The signing key only matters if the institution may generate QR codes.
-  const keyApplies = config.generation
-  const steps: (StepDef & { id: StepId })[] = [
-    { id: 'institution', label: 'Institution' },
-    { id: 'configuration', label: 'Configuration' },
-    { id: 'rate', label: 'Rate card' },
-    { id: 'certificate', label: 'Certificate', optional: true },
-    ...(keyApplies ? [{ id: 'key' as const, label: 'Signing key', optional: true }] : []),
-    { id: 'credentials', label: 'Credentials' },
-    { id: 'review', label: 'Review' },
-  ]
+  const onboarding = useOnboarding(tenantId).data
+  const registerTenant = useRegisterTenant()
+  const saveConfiguration = useSaveConfiguration()
+  const provision = useProvisionCredentials()
+  const registerCertificate = useRegisterCertificate()
+  const skipCertificate = useSkipCertificate()
+  const createKey = useCreateSigningKey()
+  const activate = useTenantAction()
+  const busy = [registerTenant, saveConfiguration, provision, registerCertificate, skipCertificate, createKey, activate].some((m) => m.isPending)
+
   const index = steps.findIndex((s) => s.id === stepId)
-  const go = (delta: number) => setStepId(steps[Math.min(steps.length - 1, Math.max(0, index + delta))].id)
-  const save = (patch: Partial<Institution>) => recordId && patchInstitution(recordId, patch)
-  // The card the activation gate and Review care about: one in effect for the current month.
-  const rateCard = recordId ? cardFor(rateCards, recordId, currentMonth()) : null
+  const goTo = (id: StepCode) => {
+    setError(null)
+    setStepId(id)
+  }
+  const go = (delta: number) => goTo(steps[Math.min(steps.length - 1, Math.max(0, index + delta))].id)
+  const fail = (e: unknown) => setError(errorMessage(e))
 
   function register(p: Profile) {
-    if (!recordId) {
-      const id = `inst-${Date.now()}`
-      addInstitution({
-        id, name: p.name, type: p.type, code: institutionCode(p.type, p.institutionId), status: 'Pending',
-        contactName: p.contactName, email: p.email, phone: p.phone, address: p.address,
-        access: null, certificate: null, keyMode: null,
-      })
-      setRecordId(id)
+    if (tenantId) {
+      setProfile(p)
+      return go(1)
     }
-    setProfile(p)
-    go(1)
+    setError(null)
+    registerTenant.mutate(p, {
+      onSuccess: (tenant) => {
+        setTenantId(tenant.tenantId)
+        setProfile(p)
+        go(1)
+      },
+      onError: fail,
+    })
+  }
+
+  function saveConfig() {
+    if (!tenantId) return
+    // Credentials already scope the capabilities, and the API refuses a change after that.
+    if (onboarding?.credential) return go(1)
+    setError(null)
+    saveConfiguration.mutate({ id: tenantId, ...config }, { onSuccess: () => go(1), onError: fail })
+  }
+
+  function issueCredentials() {
+    if (!tenantId) return
+    setError(null)
+    provision.mutate(
+      { id: tenantId, ...config },
+      {
+        onSuccess: (issued) => {
+          // null: the API said they already exist (a retry after a dropped connection). Nothing to show.
+          if (issued) setShownSecret({ clientId: issued.clientId, secret: issued.clientSecret })
+          else toast.success('Credentials were already issued.')
+        },
+        onError: fail,
+      },
+    )
+  }
+
+  function dismissSecret() {
+    setShownSecret(null)
+    // Drop the mutation result too: it holds the secret for as long as this screen is mounted.
+    provision.reset()
+  }
+
+  function skipCert() {
+    if (!tenantId) return
+    if (stepStatus(onboarding, 'CERTIFICATE') === 'SKIPPED') return go(1)
+    setError(null)
+    skipCertificate.mutate({ id: tenantId }, { onSuccess: () => go(1), onError: fail })
+  }
+
+  function activateInstitution() {
+    if (!tenantId) return
+    setError(null)
+    setRefusal([])
+    activate.mutate(
+      { id: tenantId, action: 'activate' },
+      {
+        onSuccess: () => setResult('Active'),
+        onError: (e) => {
+          fail(e)
+          if (e instanceof ApiError) setRefusal(e.blockers)
+        },
+      },
+    )
   }
 
   function reset() {
-    setRecordId(null)
-    setStepId('institution')
+    provision.reset()
+    setTenantId(null)
+    setStepId('PROFILE')
     setProfile(null)
     setConfig({ generation: true, validation: true })
-    setAccess(null)
-    setCertificate(null)
-    setKeyMode(null)
+    setShownSecret(null)
     setResult(null)
+    setError(null)
+    setRefusal([])
   }
 
   if (result && profile) {
@@ -123,107 +204,69 @@ function Onboarding({ existing }: { existing: Institution | null }) {
         <ArrowLeft className="size-4" aria-hidden /> Institutions
       </Link>
       <h2 className="mb-1.5 font-head text-2xl font-bold tracking-tight">{existing ? `Continue setup: ${existing.name}` : 'New institution'}</h2>
-      <p className="mb-6 text-text-2">Register a financial institution and set it up to generate and validate Secure Bangla QR.</p>
+      <p className="mb-6 text-text-2">Register a financial institution and set it up to generate and validate Secure Bangla QR. Each step is saved as you go.</p>
 
       <Stepper steps={steps} current={index} />
 
-      {stepId === 'institution' && <InstitutionStep initial={profile} locked={!!profile} onSubmit={register} />}
-      {stepId === 'configuration' && (
+      {stepId === 'PROFILE' && <InstitutionStep initial={profile} locked={!!tenantId} busy={busy} error={error} onSubmit={register} />}
+      {stepId === 'CONFIGURATION' && (
         <ConfigurationStep
           generation={config.generation}
           validation={config.validation}
-          issuedClientId={access?.clientId ?? null}
-          onChange={(kind, value) => {
-            setConfig((c) => ({ ...c, [kind]: value }))
-            // After issuance a capability change applies to the issued credentials — no new secret.
-            if (access && recordId) {
-              const next = { ...access, [kind]: value }
-              setAccess(next)
-              save({ access: next })
-            }
-          }}
+          locked={!!onboarding?.credential}
+          busy={busy}
+          error={error}
+          onChange={(kind, value) => setConfig((c) => ({ ...c, [kind]: value }))}
           onBack={() => go(-1)}
-          onContinue={() => go(1)}
+          onContinue={saveConfig}
         />
       )}
-      {stepId === 'rate' && (
-        <RateCardStep
-          capabilities={config}
-          card={rateCard}
-          startMonth={currentMonth()}
-          onBack={() => go(-1)}
-          onContinue={() => go(1)}
-          onSave={(generationRate, validationRate) => {
-            // Billing starts the month the institution goes live, so the card starts now.
-            if (recordId) addRateCard({ institutionId: recordId, effectiveFrom: `${currentMonth()}-01`, generationRate, validationRate })
-            go(1)
-          }}
-        />
+      {stepId === 'CREDENTIALS' && (
+        <CredentialsStep capabilities={config} issued={onboarding?.credential ?? null} busy={busy} error={error} onBack={() => go(-1)} onIssue={issueCredentials} onContinue={() => go(1)} />
       )}
-      {stepId === 'certificate' && (
+      {stepId === 'CERTIFICATE' && (
         <CertificateStep
-          initial={certificate}
+          registered={onboarding?.certificate ?? null}
+          busy={busy}
+          error={error}
           onBack={() => go(-1)}
-          onSkip={() => go(1)}
-          onSubmit={(c) => {
-            setCertificate(c)
-            save({ certificate: c })
-            go(1)
-          }}
-        />
-      )}
-      {stepId === 'key' && (
-        <KeyStep
-          initial={keyMode}
-          onBack={() => go(-1)}
-          onSkip={() => go(1)}
-          onSubmit={(m) => {
-            setKeyMode(m)
-            save({ keyMode: m })
-            go(1)
-          }}
-        />
-      )}
-      {stepId === 'credentials' && profile && (
-        <CredentialsStep
-          capabilities={config}
-          access={access}
-          onBack={() => go(-1)}
-          onIssue={() => {
-            const c = demoCredentials(institutionCode(profile.type, profile.institutionId))
-            const next = { generation: config.generation, validation: config.validation, clientId: c.clientId }
-            setAccess(next)
-            save({ access: next })
-            setShownSecret(c)
-          }}
+          onSkip={skipCert}
           onContinue={() => go(1)}
+          onSubmit={(certificate) => {
+            if (!tenantId) return
+            setError(null)
+            registerCertificate.mutate({ id: tenantId, certificate }, { onSuccess: () => go(1), onError: fail })
+          }}
         />
       )}
-      {stepId === 'review' && profile && access && (
+      {stepId === 'SIGNING_KEY' && (
+        <KeyStep
+          existing={onboarding?.signingKey ?? null}
+          busy={busy}
+          error={error}
+          onBack={() => go(-1)}
+          onContinue={() => go(1)}
+          onSubmit={(mode, privateKeyPem) => {
+            if (!tenantId) return
+            setError(null)
+            createKey.mutate({ id: tenantId, mode, privateKeyPem }, { onSuccess: () => go(1), onError: fail })
+          }}
+        />
+      )}
+      {stepId === 'REVIEW' && profile && (
         <ReviewStep
           profile={profile}
-          access={access}
-          rate={rateCard}
-          certificate={certificate}
-          keyMode={keyMode}
-          keyApplies={keyApplies}
+          onboarding={onboarding}
+          refusal={refusal}
+          busy={busy}
+          error={error}
           onBack={() => go(-1)}
-          onFinish={(activate) => {
-            save({ status: activate ? 'Active' : 'Pending' })
-            setResult(activate ? 'Active' : 'Pending')
-          }}
+          onFinishLater={() => setResult('Pending')}
+          onActivate={activateInstitution}
         />
       )}
 
-      {shownSecret && (
-        <SecretDialog
-          clientId={shownSecret.clientId}
-          secret={shownSecret.secret}
-          onDone={() => {
-            setShownSecret(null)
-          }}
-        />
-      )}
+      {shownSecret && <SecretDialog clientId={shownSecret.clientId} secret={shownSecret.secret} onDone={dismissSecret} />}
     </div>
   )
 }

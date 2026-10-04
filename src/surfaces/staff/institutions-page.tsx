@@ -2,23 +2,22 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Role } from '../../shared/auth/session'
-import { Card, EmptyRow, Input, Select, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
+import { errorMessage } from '../../shared/api/client'
+import { Banner, Card, EmptyRow, Input, Select, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
 import { institutionNote } from './institutions/actions'
 import { ActionButtons } from './institutions/action-buttons'
 import { useInstitutionActions } from './institutions/use-institution-actions'
-import { useInstitutions } from './institutions/store'
+import { useInstitutionList } from './institutions/api/hooks'
 import type { InstitutionStatus } from './institutions/types'
-import { cardFor, currentMonth } from './rates/rates'
-import { useRateCards } from './rates/store'
 import { institutionTypes, typeLabel } from './onboarding/institution-types'
 
 const statuses: InstitutionStatus[] = ['Pending', 'Active', 'Suspended', 'Terminated']
 
-/** Institutions list. UI only: actions change the in-memory store, nothing is sent to an API. */
+/** Institutions list, read from the tenants API. Lifecycle actions call the API and the list refetches. */
 export function InstitutionsPage({ role }: { role: Role }) {
   const navigate = useNavigate()
-  const institutions = useInstitutions()
-  const cards = useRateCards()
+  const list = useInstitutionList()
+  const institutions = list.data ?? []
   const canManage = role === 'admin'
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
@@ -59,6 +58,15 @@ export function InstitutionsPage({ role }: { role: Role }) {
         )}
       </div>
 
+      {list.isError && (
+        <Banner tone="bad" title="Could not load institutions">
+          {errorMessage(list.error)}{' '}
+          <button type="button" className="font-semibold underline" onClick={() => void list.refetch()}>
+            Try again
+          </button>
+        </Banner>
+      )}
+
       <Card>
         <Table>
           <thead>
@@ -72,9 +80,10 @@ export function InstitutionsPage({ role }: { role: Role }) {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <EmptyRow cols={canManage ? 6 : 5} title="No institutions match" hint="Clear the search or filters." />}
+            {list.isPending && <EmptyRow cols={canManage ? 6 : 5} title="Loading institutions…" />}
+            {!list.isPending && !list.isError && rows.length === 0 && <EmptyRow cols={canManage ? 6 : 5} title="No institutions match" hint="Clear the search or filters." />}
             {rows.map((inst) => {
-              const note = institutionNote(inst, !!cardFor(cards, inst.id, currentMonth()))
+              const note = institutionNote(inst)
               return (
                 // The name is a real link for keyboard and screen readers; the row click is the mouse shortcut.
                 <Tr key={inst.id} onClick={() => navigate(`/staff/institutions/${inst.id}`)}>

@@ -4,17 +4,13 @@ import { Banner } from '../../../shared/ui'
 import { sampleEvents } from '../../../shared/usage/sample'
 import { summarize } from '../../../shared/usage/usage'
 import { UsageTable } from '../../../shared/usage/usage-table'
-import { useInstitutions } from '../institutions/store'
-import { currentMonth, priceGaps } from '../rates/rates'
-import { useRateCards } from '../rates/store'
+import { useInstitutions } from '../institutions/api/hooks'
 
-/** Usage tab of an institution: totals, then every event. UI only: sample events. */
+/** Usage tab of an institution: totals, then every event. Events are sample data until the usage API is wired. */
 export function InstitutionUsageTab({ institutionId }: { institutionId: string }) {
-  const cards = useRateCards()
-  const access = useInstitutions().find((i) => i.id === institutionId)?.access ?? null
-  const gaps = priceGaps(access, cards, institutionId, currentMonth())
-  const noCard = gaps.some((g) => g.reason === 'no-card')
-  const free = gaps.filter((g) => g.reason === 'zero-price').map((g) => g.operation)
+  const inst = useInstitutions().find((i) => i.id === institutionId)
+  // Whether a rate card exists comes from the API; the events below are still sample data.
+  const noCard = !!inst?.access && !inst.hasRateCard
   const events = sampleEvents.filter((e) => e.institutionId === institutionId)
   const s = summarize(events)
   const totals = [
@@ -29,11 +25,6 @@ export function InstitutionUsageTab({ institutionId }: { institutionId: string }
       {noCard && (
         <Banner tone="info" title="No rate card">
           This institution has no rate card for the current period. Its usage is recorded, but no statement is produced. <Link to="/staff/rates">Set a rate card</Link>.
-        </Banner>
-      )}
-      {free.length > 0 && (
-        <Banner tone="warn" title="Priced at ৳0 this month">
-          {free.join(' and ')} {free.length === 1 ? 'is' : 'are'} allowed for this institution but free under its current rate card. <Link to="/staff/rates">Review rate cards</Link>.
         </Banner>
       )}
       <dl className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">

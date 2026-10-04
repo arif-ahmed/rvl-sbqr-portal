@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { periodName } from '../../../shared/format'
 import { Button, Drawer, Field, Input, Select, toast } from '../../../shared/ui'
-import { useInstitutions } from '../institutions/store'
+import { useInstitutions } from '../institutions/api/hooks'
 import { accessSummary, nextMonth, rateCardSchema, type RateCardForm } from './rates'
 import { addRateCard, useRateCards } from './store'
 

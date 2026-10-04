@@ -125,17 +125,64 @@ export async function authenticate(clientId: string, clientSecret: string): Prom
   return decodeClaims(token)
 }
 
-/** Authed GET. Re-mints once and retries on 401 (expired token). */
-export async function apiGet<T>(path: string): Promise<T> {
-  const attempt = (token: string) => fetch(path, { headers: { Authorization: `Bearer ${token}` } })
+/** A reason the API refuses to continue, such as an activation precondition. */
+export type Blocker = { code: string; message: string }
+
+/**
+ * A non-2xx API response. `title` and `detail` come from the problem-details body when there is
+ * one; `blockers` is the optional list of unmet preconditions (e.g. why activation was refused).
+ * The message stays "<METHOD> <path> failed: <status>" — use `errorMessage` for UI text.
+ */
+export class ApiError extends Error {
+  readonly status: number
+  readonly title: string | null
+  readonly detail: string | null
+  readonly blockers: Blocker[]
+
+  constructor(method: string, path: string, status: number, problem: unknown) {
+    super(`${method} ${path} failed: ${status}`)
+    this.name = 'ApiError'
+    this.status = status
+    const body = problem && typeof problem === 'object' ? (problem as Record<string, unknown>) : {}
+    this.title = typeof body.title === 'string' ? body.title : null
+    this.detail = typeof body.detail === 'string' ? body.detail : null
+    this.blockers = Array.isArray(body.blockers)
+      ? body.blockers.filter((b): b is Blocker => !!b && typeof (b as Blocker).code === 'string' && typeof (b as Blocker).message === 'string')
+      : []
+  }
+}
+
+/** UI text for a failed request: the server's explanation when it gave one. */
+export function errorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
+  if (error instanceof ApiError) return error.detail ?? error.title ?? fallback
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+/** Authed request. Re-mints once and retries on 401 (expired token). Bodies are JSON; 204 resolves to undefined. */
+async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  const attempt = (token: string) =>
+    fetch(path, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
   let res = await attempt(await bearer())
   if (res.status === 401) {
     cached = null
     res = await attempt(await mint())
   }
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  if (!res.ok) throw new ApiError(method, path, res.status, await res.json().catch(() => null))
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
+
+/** Authed GET. */
+export const apiGet = <T>(path: string): Promise<T> => request<T>('GET', path)
+
+/** Authed POST / PUT / PATCH / DELETE with an optional JSON body. */
+export const apiSend = <T = void>(method: Exclude<Method, 'GET'>, path: string, body?: unknown): Promise<T> => request<T>(method, path, body)
 
 /** Drop credentials, token and any pending refresh — called on sign-out and in tests. */
 export function resetApiClient() {

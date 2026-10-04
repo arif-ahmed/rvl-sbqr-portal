@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { authenticate, resetApiClient, type TokenClaims } from '../api/client'
+import { queryClient } from '../api/query'
 
 export type Role = 'admin' | 'finance' | 'fi'
 export type Surface = 'staff' | 'fi'
@@ -86,4 +87,5 @@ export async function signIn(clientId: string, clientSecret: string, surface: Su
 export function signOut() {
   setSession(null)
   resetApiClient()
+  queryClient.clear()
 }

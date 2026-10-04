@@ -1,36 +1,25 @@
+import { isStepDone, stepLabels } from './api/mappers'
+import type { OnboardingDto } from './api/types'
 import type { Institution } from './types'
 
 export type ActionId = 'continue' | 'activate' | 'suspend' | 'reactivate' | 'certificate' | 'terminate'
 
-/**
- * Setup items an institution needs before it is fully ready. The signing key only applies if it
- * may generate QR codes. `hasRateCard` is whether a card is in effect this month — without one
- * the institution cannot be activated, because its usage would never be billed.
- */
-export function setupItems(i: Institution, hasRateCard: boolean) {
-  return [
-    { label: 'Institution', done: true },
-    { label: 'Credentials', done: !!i.access },
-    { label: 'Rate card', done: hasRateCard },
-    { label: 'Certificate', done: !!i.certificate },
-    ...(i.access?.generation !== false ? [{ label: 'Signing key', done: !!i.keyMode }] : []),
-  ]
+/** The onboarding steps and whether each is done (a skipped optional step counts as done), for the progress card. */
+export function setupItems(onboarding: OnboardingDto | undefined) {
+  return (onboarding?.steps ?? []).map((s) => ({ label: stepLabels[s.code], done: isStepDone(s.status) }))
 }
-
-export const isSetupComplete = (i: Institution, hasRateCard: boolean) => setupItems(i, hasRateCard).every((s) => s.done)
 
 /**
  * What an admin can do to an institution, following the backend lifecycle:
  * Pending -> Active (activate), Active <-> Suspended (suspend / reactivate), any -> Terminated (one-way).
- * `primary` is the one next step worth a button; `menu` is the rest.
+ * `primary` is the one next step worth a button; `menu` is the rest. A Pending institution whose
+ * only remaining step is Review is ready to activate; the API still names anything missing.
  */
-export function actionsFor(i: Institution, hasRateCard: boolean): { primary: ActionId | null; menu: ActionId[] } {
+export function actionsFor(i: Institution): { primary: ActionId | null; menu: ActionId[] } {
   switch (i.status) {
     case 'Pending': {
-      const complete = isSetupComplete(i, hasRateCard)
-      // Only the optional items (certificate, signing key) may still be missing at activation.
-      const canActivate = !!i.access && hasRateCard
-      return { primary: complete ? 'activate' : 'continue', menu: [...(canActivate && !complete ? (['activate'] as const) : []), 'suspend', 'terminate'] }
+      const ready = i.setup?.currentStep === 'REVIEW'
+      return { primary: ready ? 'activate' : 'continue', menu: [...(ready ? (['continue'] as const) : []), 'suspend', 'terminate'] }
     }
     case 'Active':
       return { primary: null, menu: ['certificate', 'suspend', 'terminate'] }
@@ -53,12 +42,11 @@ export const actionLabel: Record<ActionId, string> = {
 /** Whole days until an ISO date (negative if past). */
 export const daysUntil = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
 
-/** What to flag under an institution's name: unfinished setup, or a certificate about to expire. */
-export function institutionNote(inst: Institution, hasRateCard: boolean): { text: string; warn: boolean } | null {
-  const items = setupItems(inst, hasRateCard)
-  const done = items.filter((s) => s.done).length
-  if (inst.status === 'Pending' && done < items.length) return { text: `${done} of ${items.length} setup items done`, warn: false }
-  const expiry = inst.certificate && inst.status === 'Active' ? daysUntil(inst.certificate.expiresAt) : null
-  if (expiry !== null && expiry <= 30) return { text: expiry < 0 ? 'Certificate has expired' : `Certificate expires in ${expiry} days`, warn: true }
+/** What to flag under an institution's name: unfinished setup, or a live institution that cannot be billed. */
+export function institutionNote(inst: Institution): { text: string; warn: boolean } | null {
+  if (inst.status === 'Pending' && inst.setup && inst.setup.completed < inst.setup.total) {
+    return { text: `${inst.setup.completed} of ${inst.setup.total} setup steps done`, warn: false }
+  }
+  if (inst.status === 'Active' && !inst.hasRateCard) return { text: 'No rate card, usage is not billed', warn: true }
   return null
 }

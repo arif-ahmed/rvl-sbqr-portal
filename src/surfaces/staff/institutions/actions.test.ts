@@ -1,37 +1,66 @@
 import { describe, expect, it } from 'vitest'
-import { actionsFor, isSetupComplete } from './actions'
-import { getInstitutions } from './store'
+import { actionsFor, institutionNote, setupItems } from './actions'
+import type { OnboardingDto } from './api/types'
 import type { Institution } from './types'
 
-const byName = (name: string): Institution => getInstitutions().find((i) => i.name.startsWith(name))!
+const base: Institution = {
+  id: 'i', name: 'Example Bank', type: '00', code: '000901', status: 'Active', contactName: '', email: '', phone: '', address: '',
+  access: { generation: true, validation: true }, hasRateCard: true, setup: null,
+}
+const pending = (currentStep: NonNullable<Institution['setup']>['currentStep'], completed = 3): Institution => ({
+  ...base, status: 'Pending', setup: { completed, total: 6, currentStep },
+})
 
 describe('actionsFor', () => {
   it('lets an Active institution be suspended, terminated or get a new certificate', () => {
-    expect(actionsFor(byName('Shapla'), true)).toEqual({ primary: null, menu: ['certificate', 'suspend', 'terminate'] })
+    expect(actionsFor(base)).toEqual({ primary: null, menu: ['certificate', 'suspend', 'terminate'] })
   })
 
-  it('points a Pending institution with gaps at Continue setup', () => {
-    const surma = byName('Surma')
-    expect(isSetupComplete(surma, false)).toBe(false)
-    expect(actionsFor(surma, false)).toEqual({ primary: 'continue', menu: ['suspend', 'terminate'] })
+  it('points a Pending institution with steps left at Continue setup', () => {
+    expect(actionsFor(pending('CERTIFICATE'))).toEqual({ primary: 'continue', menu: ['suspend', 'terminate'] })
   })
 
-  it('offers Activate as the main action once setup is complete', () => {
-    const done = { ...byName('Shapla'), status: 'Pending' as const }
-    expect(actionsFor(done, true).primary).toBe('activate')
-  })
-
-  it('keeps Activate available when only the optional items are missing, as long as a card is in effect', () => {
-    const surma = byName('Surma') // has credentials, lacks certificate and signing key
-    expect(actionsFor(surma, true)).toEqual({ primary: 'continue', menu: ['activate', 'suspend', 'terminate'] })
-  })
-
-  it('does not require a signing key from a validate-only institution', () => {
-    expect(isSetupComplete(byName('Teesta'), true)).toBe(true)
+  it('offers Activate as the main action once only Review is left, and keeps Continue in the menu', () => {
+    expect(actionsFor(pending('REVIEW', 5))).toEqual({ primary: 'activate', menu: ['continue', 'suspend', 'terminate'] })
   })
 
   it('offers Reactivate for Suspended and nothing for Terminated', () => {
-    expect(actionsFor(byName('Chandra'), true)).toEqual({ primary: 'reactivate', menu: ['terminate'] })
-    expect(actionsFor(byName('Doyel'), true)).toEqual({ primary: null, menu: [] })
+    expect(actionsFor({ ...base, status: 'Suspended' })).toEqual({ primary: 'reactivate', menu: ['terminate'] })
+    expect(actionsFor({ ...base, status: 'Terminated' })).toEqual({ primary: null, menu: [] })
+  })
+})
+
+describe('institutionNote', () => {
+  it('counts the setup steps of a Pending institution', () => {
+    expect(institutionNote(pending('CREDENTIALS', 2))).toEqual({ text: '2 of 6 setup steps done', warn: false })
+  })
+
+  it('warns when a live institution has no rate card', () => {
+    expect(institutionNote({ ...base, hasRateCard: false })).toEqual({ text: 'No rate card, usage is not billed', warn: true })
+  })
+
+  it('says nothing about a healthy institution', () => {
+    expect(institutionNote(base)).toBeNull()
+  })
+})
+
+describe('setupItems', () => {
+  it('counts a skipped optional step as done', () => {
+    const onboarding = {
+      steps: [
+        { code: 'PROFILE', status: 'COMPLETED' },
+        { code: 'CERTIFICATE', status: 'SKIPPED' },
+        { code: 'SIGNING_KEY', status: 'NOT_STARTED' },
+      ],
+    } as OnboardingDto
+    expect(setupItems(onboarding)).toEqual([
+      { label: 'Institution', done: true },
+      { label: 'Certificate', done: true },
+      { label: 'Signing key', done: false },
+    ])
+  })
+
+  it('is empty until the onboarding view has loaded', () => {
+    expect(setupItems(undefined)).toEqual([])
   })
 })

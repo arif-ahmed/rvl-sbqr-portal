@@ -1,5 +1,7 @@
+import { QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { queryClient } from './shared/api/query'
 import { homePath, useSession, type Surface } from './shared/auth/session'
 import { Toaster } from './shared/ui'
 
@@ -22,18 +24,21 @@ function Fallback() {
   return <Navigate to={session ? homePath(session) : '/login'} replace />
 }
 
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <Suspense fallback={null}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/staff/*" element={<Guard surface="staff">{(s) => <StaffSurface session={s} />}</Guard>} />
-          <Route path="/fi/*" element={<Guard surface="fi">{(s) => <FiSurface session={s} />}</Guard>} />
-          <Route path="*" element={<Fallback />} />
-        </Routes>
-      </Suspense>
-      <Toaster />
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/staff/*" element={<Guard surface="staff">{(s) => <StaffSurface session={s} />}</Guard>} />
+            <Route path="/fi/*" element={<Guard surface="fi">{(s) => <FiSurface session={s} />}</Guard>} />
+            <Route path="*" element={<Fallback />} />
+          </Routes>
+        </Suspense>
+        <Toaster />
+      </BrowserRouter>
+    </QueryClientProvider>
   )
 }

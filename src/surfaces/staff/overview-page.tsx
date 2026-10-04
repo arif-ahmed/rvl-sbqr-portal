@@ -6,8 +6,8 @@ import { cn } from '../../shared/cn'
 import { bdt, count, monthShort, periodName } from '../../shared/format'
 import { draftPeriod, openIssues, pendingAdjustments, periodTotals, queuedEvents } from '../../shared/billing/billing'
 import { useBilling } from '../../shared/billing/store'
-import { useInstitutions } from './institutions/store'
-import { daysUntil } from './institutions/actions'
+import { useInstitutions } from './institutions/api/hooks'
+
 import { BarChart, Button, Card, CardHeader, Kpi, Table, Td, Th, Tr } from '../../shared/ui'
 
 type Tone = 'ok' | 'warn' | 'info' | 'bad'
@@ -53,11 +53,9 @@ export function OverviewPage({ session }: { session: Session }) {
   const attention: AttentionItem[] = []
   if (queued > 0) attention.push({ tone: 'warn', icon: AlertTriangle, title: `${queued} usage events queued`, sub: `${nameOf(queuedEvents(billing)[0].institutionId)} · blocks finalizing`, to: '/staff/periods' })
   if (pending > 0 && draft) attention.push({ tone: 'info', icon: Info, title: `${pending} pending adjustments`, sub: `Applied when ${periodName(draft)} is finalized`, to: '/staff/adjustments' })
-  for (const i of active) {
-    const days = i.certificate ? daysUntil(i.certificate.expiresAt) : null
-    if (days !== null && days <= 30)
-      attention.push({ tone: 'warn', icon: Clock, title: days < 0 ? 'Certificate has expired' : `Certificate expires in ${days} days`, sub: i.name, to: `/staff/institutions/${i.id}` })
-  }
+  // Certificate expiry is not in the tenant list; the institution page warns about it. A live institution with no rate card is.
+  for (const i of active.filter((a) => !a.hasRateCard))
+    attention.push({ tone: 'warn', icon: Clock, title: 'No rate card, usage is not billed', sub: i.name, to: `/staff/institutions/${i.id}` })
   const awaiting = institutions.find((i) => i.status === 'Pending')
   if (awaiting) attention.push({ tone: 'info', icon: Building2, title: 'Activation pending', sub: awaiting.name, to: `/staff/institutions/${awaiting.id}` })
 

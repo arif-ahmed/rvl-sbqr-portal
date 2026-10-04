@@ -6,8 +6,8 @@ import { useBilling } from '../../../shared/billing/store'
 import { StatementDrawer } from '../../../shared/billing/statement-drawer'
 import { Card, CardHeader, EmptyRow, StatusChip, Table, Td, Th, Tr } from '../../../shared/ui'
 
-/** One institution's billing: the statements it has received and the price its usage is charged at. UI only. */
-export function InstitutionBillingTab({ institutionId, institutionName }: { institutionId: string; institutionName: string }) {
+/** One institution's billing: the statements it has received and the price its usage is charged at. Statements are still sample data; whether a rate card exists comes from the API. */
+export function InstitutionBillingTab({ institutionId, institutionName, hasRateCard }: { institutionId: string; institutionName: string; hasRateCard: boolean }) {
   const billing = useBilling()
   const [selected, setSelected] = useState<Statement | null>(null)
   const statements = [...billing.periods]
@@ -67,10 +67,15 @@ export function InstitutionBillingTab({ institutionId, institutionName }: { inst
             <dt className="text-text-3">Currency</dt>
             <dd>BDT</dd>
           </dl>
+        ) : hasRateCard ? (
+          <p className="p-5 text-text-3">
+            <b className="block text-[15px] text-text">Rate card set</b>
+            Prices are managed on the Rates page.
+          </p>
         ) : (
           <p className="p-5 text-text-3">
             <b className="block text-[15px] text-text">No rate card</b>
-            Usage cannot be billed until one exists.
+            Usage is recorded but cannot be billed until a rate card takes effect. Rate cards start on the 1st of a future month.
           </p>
         )}
         <p className="border-t border-line px-5 py-3">

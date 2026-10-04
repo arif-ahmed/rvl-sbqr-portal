@@ -41,8 +41,11 @@ export default function StaffSurface({ session }: { session: Session }) {
           element={shell(p.label, page(p.to, p.label))}
         />
       ))}
-      {/* Admin only; Finance falls through to the redirect below. The API enforces this too. */}
-      {session.role === 'admin' && <Route path="institutions/new" element={shell('New institution', <OnboardingPage />)} />}
+      {/* Admin only; Finance goes back to the list (not on to institutions/:id, which would ask the API for a tenant called "new"). The API enforces this too. */}
+      <Route
+        path="institutions/new"
+        element={session.role === 'admin' ? shell('New institution', <OnboardingPage />) : <Navigate to="/staff/institutions" replace />}
+      />
       <Route path="periods/:period/statements/:institutionId" element={shell('Statement', <StatementPage />)} />
       <Route path="reports/institution" element={shell('Reports', <ReportsPage view="institution" />)} />
       <Route path="reports/trend" element={shell('Reports', <ReportsPage view="trend" />)} />
