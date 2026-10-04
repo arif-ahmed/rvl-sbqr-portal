@@ -10,7 +10,6 @@ export type Profile = {
   address: string
 }
 export type Access = { generation: boolean; validation: boolean }
-export type Certificate = { thumbprint: string; subject: string; expiresAt: string }
 export type KeyMode = 'Generate' | 'Adopt'
 
 export type InstitutionStatus = 'Pending' | 'Active' | 'Suspended' | 'Terminated'

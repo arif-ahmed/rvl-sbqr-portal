@@ -53,7 +53,7 @@ export function OverviewPage({ session }: { session: Session }) {
   const attention: AttentionItem[] = []
   if (queued > 0) attention.push({ tone: 'warn', icon: AlertTriangle, title: `${queued} usage events queued`, sub: `${nameOf(queuedEvents(billing)[0].institutionId)} · blocks finalizing`, to: '/staff/periods' })
   if (pending > 0 && draft) attention.push({ tone: 'info', icon: Info, title: `${pending} pending adjustments`, sub: `Applied when ${periodName(draft)} is finalized`, to: '/staff/adjustments' })
-  // Certificate expiry is not in the tenant list; the institution page warns about it. A live institution with no rate card is.
+  // Certificate expiry is not in the tenant list (the column was retired); a live institution with no rate card is.
   for (const i of active.filter((a) => !a.hasRateCard))
     attention.push({ tone: 'warn', icon: Clock, title: 'No rate card, usage is not billed', sub: i.name, to: `/staff/institutions/${i.id}` })
   const awaiting = institutions.find((i) => i.status === 'Pending')
@@ -73,7 +73,7 @@ export function OverviewPage({ session }: { session: Session }) {
               ? queued > 0
                 ? `${queued} usage events are still queued. Resolve them, then finalize the month.`
                 : 'All usage is delivered. Review the draft statements and finalize the month.'
-              : `${active.length} institutions are live, ${institutions.filter((i) => i.status === 'Pending').length} awaiting activation. Onboard a new institution or review certificates nearing expiry.`}
+              : `${active.length} institutions are live, ${institutions.filter((i) => i.status === 'Pending').length} awaiting activation. Onboard a new institution or review usage for those without a rate card.`}
           </p>
         </div>
         <span className="flex-1" />

@@ -8,20 +8,20 @@ const base: Institution = {
   access: { generation: true, validation: true }, hasRateCard: true, setup: null,
 }
 const pending = (currentStep: NonNullable<Institution['setup']>['currentStep'], completed = 3): Institution => ({
-  ...base, status: 'Pending', setup: { completed, total: 6, currentStep },
+  ...base, status: 'Pending', setup: { completed, total: 5, currentStep },
 })
 
 describe('actionsFor', () => {
-  it('lets an Active institution be suspended, terminated or get a new certificate', () => {
-    expect(actionsFor(base)).toEqual({ primary: null, menu: ['certificate', 'suspend', 'terminate'] })
+  it('lets an Active institution be suspended or terminated', () => {
+    expect(actionsFor(base)).toEqual({ primary: null, menu: ['suspend', 'terminate'] })
   })
 
   it('points a Pending institution with steps left at Continue setup', () => {
-    expect(actionsFor(pending('CERTIFICATE'))).toEqual({ primary: 'continue', menu: ['suspend', 'terminate'] })
+    expect(actionsFor(pending('CREDENTIALS'))).toEqual({ primary: 'continue', menu: ['suspend', 'terminate'] })
   })
 
   it('offers Activate as the main action once only Review is left, and keeps Continue in the menu', () => {
-    expect(actionsFor(pending('REVIEW', 5))).toEqual({ primary: 'activate', menu: ['continue', 'suspend', 'terminate'] })
+    expect(actionsFor(pending('REVIEW', 4))).toEqual({ primary: 'activate', menu: ['continue', 'suspend', 'terminate'] })
   })
 
   it('offers Reactivate for Suspended and nothing for Terminated', () => {
@@ -32,7 +32,7 @@ describe('actionsFor', () => {
 
 describe('institutionNote', () => {
   it('counts the setup steps of a Pending institution', () => {
-    expect(institutionNote(pending('CREDENTIALS', 2))).toEqual({ text: '2 of 6 setup steps done', warn: false })
+    expect(institutionNote(pending('CREDENTIALS', 2))).toEqual({ text: '2 of 5 setup steps done', warn: false })
   })
 
   it('warns when a live institution has no rate card', () => {
@@ -45,17 +45,15 @@ describe('institutionNote', () => {
 })
 
 describe('setupItems', () => {
-  it('counts a skipped optional step as done', () => {
+  it('reports the status of each step in the order the API returns', () => {
     const onboarding = {
       steps: [
         { code: 'PROFILE', status: 'COMPLETED' },
-        { code: 'CERTIFICATE', status: 'SKIPPED' },
         { code: 'SIGNING_KEY', status: 'NOT_STARTED' },
       ],
     } as OnboardingDto
     expect(setupItems(onboarding)).toEqual([
       { label: 'Institution', done: true },
-      { label: 'Certificate', done: true },
       { label: 'Signing key', done: false },
     ])
   })

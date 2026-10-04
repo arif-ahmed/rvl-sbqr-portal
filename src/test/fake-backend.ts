@@ -16,8 +16,6 @@ type Rec = {
   tenant: Tenant
   configSaved: boolean
   credential: { clientId: string } | null
-  certificate: { thumbprintSha256: string; subject: string; expiresAt: string } | null
-  certSkipped: boolean
   signingKey: boolean
   hasRateCard: boolean
   /** Per-tenant rate cards, newest EffectiveFrom first — matches the server's order. */
@@ -57,11 +55,10 @@ function tenant(id: string, name: string, code: string, status: string, contact:
   }
 }
 
-const cert = (subject: string, days: number) => ({ thumbprintSha256: 'A1'.repeat(32), subject, expiresAt: inDays(days) })
 // `blank` is a factory so every record starts with a fresh `rateCards` array —
 // otherwise `rec.rateCards.unshift(...)` in `addRateCard` would mutate the shared
 // reference and bleed across tests.
-const blank = () => ({ configSaved: false, credential: null, certificate: null, certSkipped: false, signingKey: false, hasRateCard: false, rateCards: [] as RateCardDto[], trust: true })
+const blank = () => ({ configSaved: false, credential: null, signingKey: false, hasRateCard: false, rateCards: [] as RateCardDto[], trust: true })
 
 const rateCard = (tenantId: string, effectiveFrom: string, generationRate: number, validationRate: number): RateCardDto => ({
   rateCardId: newRateCardId(),
@@ -78,13 +75,13 @@ function seed(): Rec[] {
   const now = new Date()
   const year = now.getFullYear()
   return [
-    { ...blank(), tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, certificate: cert('CN=gateway.shaplabank.example', 300), signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-1', ymd(year, 1), 0.5, 0.125), rateCard('inst-1', `${nextMonth()}-01`, 0.45, 0.12)] },
-    { ...blank(), tenant: tenant('inst-2', 'Karnaphuli Trust Bank', '000902', 'ACTIVE', 'Sabina Yasmin', 'sabina@karnaphulitrust.example'), configSaved: true, credential: { clientId: '000902-b40e5a11' }, certificate: cert('CN=gateway.karnaphulitrust.example', 12), signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-2', ymd(year, 1), 0.5, 0.125)] },
-    { ...blank(), tenant: tenant('inst-3', 'Teesta Digital Wallet', '022901', 'ACTIVE', 'Nusrat Jahan', 'nusrat@teestawallet.example', { gen: false, val: true }), configSaved: true, credential: { clientId: '022901-e93b6f48' }, certificate: cert('CN=gateway.teestawallet.example', 210), signingKey: true },
+    { ...blank(), tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-1', ymd(year, 1), 0.5, 0.125), rateCard('inst-1', `${nextMonth()}-01`, 0.45, 0.12)] },
+    { ...blank(), tenant: tenant('inst-2', 'Karnaphuli Trust Bank', '000902', 'ACTIVE', 'Sabina Yasmin', 'sabina@karnaphulitrust.example'), configSaved: true, credential: { clientId: '000902-b40e5a11' }, signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-2', ymd(year, 1), 0.5, 0.125)] },
+    { ...blank(), tenant: tenant('inst-3', 'Teesta Digital Wallet', '022901', 'ACTIVE', 'Nusrat Jahan', 'nusrat@teestawallet.example', { gen: false, val: true }), configSaved: true, credential: { clientId: '022901-e93b6f48' }, signingKey: true },
     { ...blank(), tenant: tenant('inst-4', 'Surma Payments Ltd', '032901', 'PENDING', 'Jahid Hasan', 'jahid.hasan@surmapayments.example'), configSaved: true, credential: { clientId: '032901-3f9a1c20' } },
     { ...blank(), tenant: tenant('inst-5', 'Nilgiri Mercantile Bank', '000903', 'PENDING', 'Kamal Uddin', 'kamal.uddin@nilgirimercantile.example') },
-    { ...blank(), tenant: tenant('inst-6', 'Chandra Settlement Services', '042901', 'SUSPENDED', 'Mizanur Rahman', 'mizan@chandrasettlement.example'), configSaved: true, credential: { clientId: '042901-52d7c0aa' }, certificate: cert('CN=gateway.chandrasettlement.example', 150), signingKey: true },
-    { ...blank(), tenant: tenant('inst-7', 'Doyel Co-operative Finance', '012901', 'TERMINATED', 'Farzana Akter', 'farzana@doyelfinance.example'), configSaved: true, credential: { clientId: '012901-9a08be37' }, certificate: cert('CN=gateway.doyelfinance.example', -40), signingKey: true },
+    { ...blank(), tenant: tenant('inst-6', 'Chandra Settlement Services', '042901', 'SUSPENDED', 'Mizanur Rahman', 'mizan@chandrasettlement.example'), configSaved: true, credential: { clientId: '042901-52d7c0aa' }, signingKey: true },
+    { ...blank(), tenant: tenant('inst-7', 'Doyel Co-operative Finance', '012901', 'TERMINATED', 'Farzana Akter', 'farzana@doyelfinance.example'), configSaved: true, credential: { clientId: '012901-9a08be37' }, signingKey: true },
   ]
 }
 
@@ -135,8 +132,6 @@ export class FakeBackend {
         return r.configSaved || r.credential ? 'COMPLETED' : 'NOT_STARTED'
       case 'CREDENTIALS':
         return r.credential ? 'COMPLETED' : 'NOT_STARTED'
-      case 'CERTIFICATE':
-        return r.certificate ? 'COMPLETED' : r.certSkipped ? 'SKIPPED' : 'NOT_STARTED'
       case 'SIGNING_KEY':
         return r.signingKey ? 'COMPLETED' : 'NOT_STARTED'
       case 'REVIEW':
@@ -147,7 +142,7 @@ export class FakeBackend {
   private steps(r: Rec): OnboardingStepDto[] {
     return stepOrder.map((code) => {
       const status = this.statusOf(code, r)
-      return { code, status, required: code !== 'CERTIFICATE', completedAt: status === 'COMPLETED' ? inDays(0) : null, completedBy: status === 'COMPLETED' ? 'platform:admin' : null }
+      return { code, status, required: true, completedAt: status === 'COMPLETED' ? inDays(0) : null, completedBy: status === 'COMPLETED' ? 'platform:admin' : null }
     })
   }
 
@@ -162,7 +157,7 @@ export class FakeBackend {
 
   onboarding(r: Rec): OnboardingDto {
     const steps = this.steps(r)
-    const done = (s: OnboardingStepDto) => s.status === 'COMPLETED' || s.status === 'SKIPPED'
+    const done = (s: OnboardingStepDto) => s.status === 'COMPLETED'
     const blockers = this.blockers(r)
     return {
       tenantId: r.tenant.tenantId,
@@ -174,7 +169,6 @@ export class FakeBackend {
       blockers,
       configuration: { isQrGenerationAllowed: r.tenant.isQrGenerationAllowed, isQrValidationAllowed: r.tenant.isQrValidationAllowed },
       credential: r.credential ? { clientId: r.credential.clientId, status: 'ACTIVE', expiresAt: inDays(365) } : null,
-      certificate: r.certificate,
       signingKey: r.signingKey ? { keyId: `${r.tenant.institutionCode}-key`, version: 1, status: 'ACTIVE' } : null,
     }
   }
@@ -185,7 +179,7 @@ export class FakeBackend {
     return {
       ...r.tenant,
       hasRateCard: r.hasRateCard,
-      onboarding: pending ? { completedSteps: o.steps.filter((s) => s.status === 'COMPLETED' || s.status === 'SKIPPED').length, totalSteps: o.steps.length, currentStep: o.currentStep } : null,
+      onboarding: pending ? { completedSteps: o.steps.filter((s) => s.status === 'COMPLETED').length, totalSteps: o.steps.length, currentStep: o.currentStep } : null,
     }
   }
 
@@ -298,16 +292,6 @@ export class FakeBackend {
       t.isQrValidationAllowed = b.isQrValidationAllowed !== false
       r.credential = { clientId: `${t.institutionCode}-ab12cd34` }
       return Response.json({ tenantId: t.tenantId, credentialId: 'cred-1', clientId: r.credential.clientId, clientSecret: 'fake-client-secret-0123456789', expiresAt: inDays(365) }, { status: 201 })
-    }
-    if (sub === 'client-certificate' && method === 'POST') {
-      if (!r.credential) return problem(409, 'Invariant violation', 'No active API client to bind a certificate to.')
-      r.certificate = { thumbprintSha256: String(b.thumbprintSha256), subject: String(b.subject), expiresAt: String(b.expiresAt) }
-      return Response.json(r.certificate)
-    }
-    if (sub === 'onboarding/steps/CERTIFICATE' && method === 'PUT') {
-      if (b.status !== 'SKIPPED') return problem(400, 'Invalid step', 'Only SKIPPED is accepted.')
-      r.certSkipped = true
-      return new Response(null, { status: 204 })
     }
     const lifecycle: { [action: string]: [from: string[], to: string] } = {
       activate: [['PENDING', 'SUSPENDED'], 'ACTIVE'],

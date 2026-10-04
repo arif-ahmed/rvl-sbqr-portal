@@ -153,11 +153,6 @@ describe('institution onboarding: the whole flow', () => {
     await click(user, 'Continue')
 
     // Certificate is optional: skipping is recorded on the server.
-    expect(await heading('Client certificate')).toBeInTheDocument()
-    await click(user, 'Skip for now')
-    await waitFor(() => expect(backend.callsTo('PUT', '/onboarding/steps/CERTIFICATE')).toHaveLength(1))
-    expect(backend.callsTo('PUT', '/onboarding/steps/CERTIFICATE')[0].body).toEqual({ status: 'SKIPPED' })
-
     // Signing key is required: there is no skip.
     expect(await heading('Signing key')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Skip for now' })).not.toBeInTheDocument()
@@ -169,7 +164,6 @@ describe('institution onboarding: the whole flow', () => {
     expect(await heading('Review and activate')).toBeInTheDocument()
     expect(await screen.findByText('validation')).toBeInTheDocument()
     expect(screen.getByText(/Client ID \d{6}-ab12cd34/)).toBeInTheDocument()
-    expect(screen.getByText('Skipped for now')).toBeInTheDocument()
     expect(screen.getByText(/Key \d{6}-key, version 1/)).toBeInTheDocument()
     expect(screen.getByText('No rate card yet')).toBeInTheDocument()
     await click(user, 'Activate institution')
@@ -177,27 +171,7 @@ describe('institution onboarding: the whole flow', () => {
     expect(backend.callsTo('POST', '/activate')).toHaveLength(1)
   })
 
-  it('registers a certificate with the day it expires', async () => {
-    backend.find('inst-5')!.configSaved = true
-    backend.find('inst-5')!.credential = { clientId: '000903-ab12cd34' }
-    const user = setup('/staff/institutions/new?resume=inst-5')
-    expect(await heading('Client certificate')).toBeInTheDocument()
-    await user.type(screen.getByLabelText('SHA-256 thumbprint'), 'c3'.repeat(32))
-    await user.type(screen.getByLabelText('Subject'), 'CN=gateway.nilgiri.example')
-    const day = new Date(Date.now() + 200 * 86_400_000).toISOString().slice(0, 10)
-    await user.type(screen.getByLabelText('Expires on'), day)
-    await click(user, 'Register certificate')
-    expect(await heading('Signing key')).toBeInTheDocument()
-    expect(backend.callsTo('POST', '/inst-5/client-certificate')[0].body).toEqual({
-      thumbprintSha256: 'C3'.repeat(32),
-      subject: 'CN=gateway.nilgiri.example',
-      expiresAt: `${day}T23:59:59Z`,
-    })
-  })
-
   it('validates a pasted private key, sends it once and keeps it nowhere', async () => {
-    const surma = backend.find('inst-4')!
-    surma.certSkipped = true
     const user = setup('/staff/institutions/new?resume=inst-4')
     expect(await heading('Signing key')).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: /Use an existing key/ }))
@@ -221,7 +195,7 @@ describe('institution onboarding: resuming', () => {
   it('opens at the first step that is not done', async () => {
     setup('/staff/institutions/new?resume=inst-4')
     expect(await heading('Continue setup: Surma Payments Ltd')).toBeInTheDocument()
-    expect(await heading('Client certificate')).toBeInTheDocument()
+    expect(await heading('Signing key')).toBeInTheDocument()
   })
 
   it('opens at Configuration for an institution that has only been registered', async () => {
@@ -231,7 +205,7 @@ describe('institution onboarding: resuming', () => {
 
   it('shows the credentials as issued, and locks the capabilities, after they were issued earlier', async () => {
     const user = setup('/staff/institutions/new?resume=inst-4')
-    await heading('Client certificate')
+    await heading('Signing key')
     await click(user, 'Back')
     expect(await screen.findByText('Credentials issued')).toBeInTheDocument()
     expect(screen.getByText('032901-3f9a1c20')).toBeInTheDocument()
@@ -247,7 +221,6 @@ describe('institution onboarding: resuming', () => {
 
   it('opens at Review when only activation is left, and activates', async () => {
     const surma = backend.find('inst-4')!
-    surma.certSkipped = true
     surma.signingKey = true
     const user = setup('/staff/institutions/new?resume=inst-4')
     expect(await heading('Review and activate')).toBeInTheDocument()
@@ -258,7 +231,6 @@ describe('institution onboarding: resuming', () => {
 
   it('does not bounce to the list once the institution it resumed is activated', async () => {
     const surma = backend.find('inst-4')!
-    surma.certSkipped = true
     surma.signingKey = true
     const user = setup('/staff/institutions/new?resume=inst-4')
     await heading('Review and activate')
@@ -270,7 +242,6 @@ describe('institution onboarding: resuming', () => {
 
   it('holds Activate back and explains what is missing', async () => {
     const surma = backend.find('inst-4')!
-    surma.certSkipped = true
     surma.signingKey = true
     surma.trust = false
     setup('/staff/institutions/new?resume=inst-4')
@@ -283,7 +254,6 @@ describe('institution onboarding: resuming', () => {
 
   it('can be left and resumed: Finish later keeps the progress on the server', async () => {
     const surma = backend.find('inst-4')!
-    surma.certSkipped = true
     surma.signingKey = true
     const user = setup('/staff/institutions/new?resume=inst-4')
     await heading('Review and activate')

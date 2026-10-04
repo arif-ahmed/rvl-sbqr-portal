@@ -52,17 +52,13 @@ export const stepLabels: Record<StepCode, string> = {
   PROFILE: 'Institution',
   CONFIGURATION: 'Configuration',
   CREDENTIALS: 'Credentials',
-  CERTIFICATE: 'Certificate',
   SIGNING_KEY: 'Signing key',
   REVIEW: 'Review',
 }
 
-export const isStepDone = (status: StepStatus) => status === 'COMPLETED' || status === 'SKIPPED'
+export const isStepDone = (status: StepStatus) => status === 'COMPLETED'
 
 /** The status of one step in an onboarding view, NOT_STARTED when the API did not list it. */
 export const stepStatus = (onboarding: OnboardingDto | undefined, code: StepCode): StepStatus => onboarding?.steps.find((s) => s.code === code)?.status ?? 'NOT_STARTED'
 
 export const stepOf = (onboarding: OnboardingDto | undefined, code: StepCode): OnboardingStepDto | undefined => onboarding?.steps.find((s) => s.code === code)
-
-/** Certificate expiry as a form date ('YYYY-MM-DD') — the wizard collects a day, the API stores an instant. */
-export const toExpiryInstant = (day: string) => `${day}T23:59:59Z`

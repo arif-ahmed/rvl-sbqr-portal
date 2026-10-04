@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError, errorMessage } from '../../../shared/api/client'
 import { ConfirmDialog, Textarea, toast } from '../../../shared/ui'
 import type { ActionId } from './actions'
-import { useRegisterCertificate, useTenantAction, type TenantAction } from './api/hooks'
-import { CertificateDrawer } from './certificate-drawer'
+import { useTenantAction, type TenantAction } from './api/hooks'
 import type { Institution } from './types'
 
 type Confirm = { title: string; text: (n: string) => string; label: string; danger?: boolean; reason?: boolean; done: string }
@@ -24,8 +23,8 @@ function refusal(e: unknown) {
 
 /**
  * Runs an institution action against the API. Returns `run` to start one and `dialogs` to render
- * once on the page (confirmation, reason box, certificate drawer). Lists and detail refresh on
- * their own: every mutation refetches the tenant queries before it resolves.
+ * once on the page (confirmation, reason box). Lists and detail refresh on their own: every
+ * mutation refetches the tenant queries before it resolves.
  */
 export function useInstitutionActions(): {
   run: (inst: Institution, action: ActionId) => void
@@ -33,68 +32,43 @@ export function useInstitutionActions(): {
 } {
   const navigate = useNavigate()
   const tenantAction = useTenantAction()
-  const registerCertificate = useRegisterCertificate()
   const [pending, setPending] = useState<{ inst: Institution; action: TenantAction } | null>(null)
   const [reason, setReason] = useState('')
-  const [certFor, setCertFor] = useState<Institution | null>(null)
 
   function run(inst: Institution, action: ActionId) {
     if (action === 'continue') return navigate(`/staff/institutions/new?resume=${inst.id}`)
-    if (action === 'certificate') return setCertFor(inst)
     setReason('')
     setPending({ inst, action })
   }
 
   const copy = pending ? confirmCopy[pending.action] : undefined
-  const dialogs = (
-    <>
-      {copy && pending && (
-        <ConfirmDialog
-          open
-          onOpenChange={(o) => !o && setPending(null)}
-          title={copy.title}
-          description={
-            <>
-              {copy.text(pending.inst.name)}
-              {copy.reason && (
-                <Textarea aria-label="Reason (optional)" placeholder="Reason (optional)" className="mt-3 min-h-20" value={reason} onChange={(e) => setReason(e.target.value)} />
-              )}
-            </>
-          }
-          confirmLabel={copy.label}
-          danger={copy.danger}
-          onConfirm={() => {
-            const { inst, action } = pending
-            tenantAction.mutate(
-              { id: inst.id, action, reason },
-              {
-                onSuccess: () => toast.success(copy.done),
-                onError: (e) => toast.error(refusal(e)),
-                onSettled: () => setPending(null),
-              },
-            )
-          }}
-        />
-      )}
-      <CertificateDrawer
-        open={!!certFor}
-        name={certFor?.name ?? ''}
-        onClose={() => setCertFor(null)}
-        onSave={(certificate) => {
-          if (!certFor) return
-          registerCertificate.mutate(
-            { id: certFor.id, certificate },
-            {
-              onSuccess: () => {
-                toast.success('Certificate replaced')
-                setCertFor(null)
-              },
-              onError: (e) => toast.error(refusal(e)),
-            },
-          )
-        }}
-      />
-    </>
-  )
+  const dialogs = copy && pending ? (
+    <ConfirmDialog
+      open
+      onOpenChange={(o) => !o && setPending(null)}
+      title={copy.title}
+      description={
+        <>
+          {copy.text(pending.inst.name)}
+          {copy.reason && (
+            <Textarea aria-label="Reason (optional)" placeholder="Reason (optional)" className="mt-3 min-h-20" value={reason} onChange={(e) => setReason(e.target.value)} />
+          )}
+        </>
+      }
+      confirmLabel={copy.label}
+      danger={copy.danger}
+      onConfirm={() => {
+        const { inst, action } = pending
+        tenantAction.mutate(
+          { id: inst.id, action, reason },
+          {
+            onSuccess: () => toast.success(copy.done),
+            onError: (e) => toast.error(refusal(e)),
+            onSettled: () => setPending(null),
+          },
+        )
+      }}
+    />
+  ) : null
   return { run, dialogs }
 }

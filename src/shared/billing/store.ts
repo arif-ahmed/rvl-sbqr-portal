@@ -99,7 +99,7 @@ function seed(): BillingData {
       },
       {
         id: 'adj-4', institutionId: 'inst-7', period: '2026-07', amount: 300,
-        reason: 'Manual certificate re-issue fee', status: 'Applied',
+        reason: 'Manual credential re-issue fee', status: 'Applied',
         createdBy: 'finance@rvl.example', createdAt: '2026-07-29 16:45',
       },
     ],

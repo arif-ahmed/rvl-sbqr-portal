@@ -6,8 +6,7 @@ import type { Blocker } from '../../../shared/api/client'
 import { Banner, Button, Card, Field, Input, Select, StatusChip, SwitchRow, Textarea } from '../../../shared/ui'
 import { useInstitutions } from '../institutions/api/hooks'
 import type { OnboardingDto } from '../institutions/api/types'
-import { certSchema } from '../institutions/schemas'
-import type { Certificate, KeyMode, Profile } from '../institutions/types'
+import type { KeyMode, Profile } from '../institutions/types'
 import { InstitutionPicker } from './institution-picker'
 import { type RegistryEntry } from './institution-registry'
 import { institutionCode, institutionTypes, typeLabel } from './institution-types'
@@ -294,68 +293,7 @@ export function CredentialsStep(
   )
 }
 
-// ---------------------------------------------------------------- 4. Certificate
-
-export function CertificateStep(
-  props: StepState & {
-    /** The certificate already registered, if any. */
-    registered: OnboardingDto['certificate']
-    onBack: () => void
-    onSkip: () => void
-    onContinue: () => void
-    onSubmit: (c: Certificate) => void
-  },
-) {
-  const { registered, busy, error, onBack, onSkip, onContinue, onSubmit } = props
-  const form = useForm<Certificate>({ resolver: zodResolver(certSchema), defaultValues: { thumbprint: '', subject: '', expiresAt: '' } })
-  const { errors } = form.formState
-
-  if (registered) {
-    return (
-      <StepCard title="Client certificate" text="mTLS certificate for the FI gateway connection.">
-        <Banner tone="ok" title="Certificate registered">
-          {registered.subject}, expires {registered.expiresAt.slice(0, 10)}. Replace it later from the institution page.
-        </Banner>
-        <Actions>
-          <Button onClick={onBack}>Back</Button>
-          <Button variant="primary" onClick={onContinue}>
-            Continue
-          </Button>
-        </Actions>
-      </StepCard>
-    )
-  }
-
-  return (
-    <StepCard title="Client certificate" text="mTLS certificate for the FI gateway connection. Add it now or later from the institution page.">
-      <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-        <Field label="SHA-256 thumbprint" htmlFor="thumbprint" error={errors.thumbprint?.message}>
-          <Input id="thumbprint" autoComplete="off" spellCheck={false} className="num" aria-invalid={!!errors.thumbprint} {...form.register('thumbprint')} />
-        </Field>
-        <div className="grid gap-x-4 sm:grid-cols-2">
-          <Field label="Subject" htmlFor="subject" error={errors.subject?.message}>
-            <Input id="subject" autoComplete="off" placeholder="CN=gateway.example" aria-invalid={!!errors.subject} {...form.register('subject')} />
-          </Field>
-          <Field label="Expires on" htmlFor="expiresAt" error={errors.expiresAt?.message}>
-            <Input id="expiresAt" type="date" aria-invalid={!!errors.expiresAt} {...form.register('expiresAt')} />
-          </Field>
-        </div>
-        <StepError error={error} />
-        <Actions>
-          <Button onClick={onBack}>Back</Button>
-          <Button disabled={busy} onClick={onSkip}>
-            Skip for now
-          </Button>
-          <Button type="submit" variant="primary" disabled={busy}>
-            {busy ? 'Registering…' : 'Register certificate'}
-          </Button>
-        </Actions>
-      </form>
-    </StepCard>
-  )
-}
-
-// ---------------------------------------------------------------- 5. Signing key
+// ---------------------------------------------------------------- 4. Signing key
 
 const pemSchema = z.string().refine((v) => /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----/.test(v.trim()), 'Paste a PEM private key.')
 
@@ -485,8 +423,6 @@ export function ReviewStep(
   const { profile, onboarding, refusal, busy, error, onBack, onFinishLater, onActivate } = props
   const config = onboarding?.configuration
   const caps = config ? [config.isQrGenerationAllowed && 'generation', config.isQrValidationAllowed && 'validation'].filter(Boolean).join(' and ') : ''
-  const certificate = onboarding?.certificate
-  const skipped = onboarding?.steps.find((s) => s.code === 'CERTIFICATE')?.status === 'SKIPPED'
   const blockers = refusal.length > 0 ? refusal : (onboarding?.blockers ?? [])
 
   return (
@@ -502,11 +438,6 @@ export function ReviewStep(
       </div>
       <Row label="Capabilities" value={caps || 'Not set'} state={caps ? 'done' : 'todo'} />
       <Row label="API credentials" value={onboarding?.credential ? `Client ID ${onboarding.credential.clientId}` : 'Not issued'} state={onboarding?.credential ? 'done' : 'todo'} />
-      <Row
-        label="Client certificate"
-        value={certificate ? `${certificate.subject}, expires ${certificate.expiresAt.slice(0, 10)}` : skipped ? 'Skipped for now' : 'Not added yet'}
-        state={certificate || skipped ? 'done' : 'todo'}
-      />
       <Row
         label="Signing key"
         value={onboarding?.signingKey ? `Key ${onboarding.signingKey.keyId}, version ${onboarding.signingKey.version}` : 'Not created yet'}

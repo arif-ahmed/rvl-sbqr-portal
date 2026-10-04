@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ApiError, apiGet, apiSend } from '../../../../shared/api/client'
-import type { Certificate, Institution, KeyMode, Profile } from '../types'
-import { toExpiryInstant, toInstitution, toRegisterRequest } from './mappers'
+import type { Institution, KeyMode, Profile } from '../types'
+import { toInstitution, toRegisterRequest } from './mappers'
 import type { OnboardingDto, PagedTenantDto, ProvisionedCredentials, TenantDto } from './types'
 
 // TanStack Query bindings for the tenant onboarding API. Every write refetches the tenant list,
@@ -103,30 +103,7 @@ export function useProvisionCredentials() {
   })
 }
 
-/** Step 4: register (or replace) the mTLS client certificate. */
-export function useRegisterCertificate() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, certificate }: { id: string; certificate: Certificate }) =>
-      apiSend('POST', `${base}/${id}/client-certificate`, {
-        thumbprintSha256: certificate.thumbprint.trim().toUpperCase(),
-        subject: certificate.subject.trim(),
-        expiresAt: toExpiryInstant(certificate.expiresAt),
-      }),
-    onSuccess: (_data, { id }) => refresh(qc, id),
-  })
-}
-
-/** Step 4, optional: remember that the certificate was deliberately skipped. */
-export function useSkipCertificate() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id }: { id: string }) => apiSend('PUT', `${base}/${id}/onboarding/steps/CERTIFICATE`, { status: 'SKIPPED' }),
-    onSuccess: (_data, { id }) => refresh(qc, id),
-  })
-}
-
-/** Step 5: generate a signing key, or adopt the institution's own. The PEM goes in the request and is kept nowhere. */
+/** Step 4: generate a signing key, or adopt the institution's own. The PEM goes in the request and is kept nowhere. */
 export function useCreateSigningKey() {
   const qc = useQueryClient()
   return useMutation({

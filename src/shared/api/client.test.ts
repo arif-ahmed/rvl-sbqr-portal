@@ -140,7 +140,7 @@ describe('apiSend', () => {
 
   it('resolves to undefined on 204 and sends no body when none is given', async () => {
     const fetchMock = await signedIn(() => new Response(null, { status: 204 }))
-    await expect(apiSend('DELETE', '/v1/admin/tenants/t1/client-certificate')).resolves.toBeUndefined()
+    await expect(apiSend('DELETE', '/v1/admin/tenants/t1/signing-key')).resolves.toBeUndefined()
     const [, init] = fetchMock.mock.calls[1]
     expect(init?.body).toBeUndefined()
     expect(init?.headers).not.toHaveProperty('Content-Type')

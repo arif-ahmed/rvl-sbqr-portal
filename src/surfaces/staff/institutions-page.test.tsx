@@ -33,7 +33,7 @@ describe('institutions list', () => {
   it('shows the institutions from the API with status and setup hints', async () => {
     await setup()
     expect(screen.getAllByRole('row')).toHaveLength(8)
-    expect(within(row('Surma')).getByText('3 of 6 setup steps done')).toBeInTheDocument()
+    expect(within(row('Surma')).getByText('3 of 5 setup steps done')).toBeInTheDocument()
     expect(within(row('Teesta')).getByText('No rate card, usage is not billed')).toBeInTheDocument()
     expect(within(row('Shapla')).queryByText(/setup steps|No rate card/)).not.toBeInTheDocument()
     expect(within(row('Nilgiri')).getByText('Not set up')).toBeInTheDocument()

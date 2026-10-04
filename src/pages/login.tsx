@@ -20,7 +20,7 @@ type Values = z.infer<typeof schema>
 const copy: Record<Surface, { headline: string; text: string; hint: string }> = {
   fi: {
     headline: 'Your QR usage, statements and credentials in one place.',
-    text: 'Review every generation and validation, download monthly statements and keep your certificate current.',
+    text: 'Review every generation and validation, download monthly statements, and rotate your client secret when it expires.',
     hint: 'your-client-id',
   },
   staff: {

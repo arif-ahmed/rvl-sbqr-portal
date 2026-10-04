@@ -4,11 +4,11 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { ApiError, errorMessage } from '../../../shared/api/client'
 import type { Role } from '../../../shared/auth/session'
 import { cn } from '../../../shared/cn'
-import { Banner, Button, Card, CardHeader, StatusChip } from '../../../shared/ui'
+import { Banner, Card, CardHeader, StatusChip } from '../../../shared/ui'
 import { typeLabel } from '../onboarding/institution-types'
 import { InstitutionUsageTab } from '../usage/institution-usage'
 import { ActionButtons } from './action-buttons'
-import { daysUntil, setupItems } from './actions'
+import { setupItems } from './actions'
 import { useInstitution, useOnboarding } from './api/hooks'
 import { InstitutionBillingTab } from './institution-billing'
 import { useInstitutionActions } from './use-institution-actions'
@@ -28,7 +28,7 @@ function Facts({ rows }: { rows: [string, ReactNode][] }) {
 
 const Empty = ({ children }: { children: ReactNode }) => <p className="p-5 text-text-3">{children}</p>
 
-/** One institution: profile, setup progress, credentials, certificate, signing key and billing, from the API. */
+/** One institution: profile, setup progress, credentials, signing key and billing, from the API. */
 export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?: 'overview' | 'usage' | 'billing' }) {
   const { id } = useParams()
   const institution = useInstitution(id)
@@ -53,8 +53,6 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
   const canManage = role === 'admin'
   const items = setupItems(onboarding)
   const done = items.filter((s) => s.done).length
-  const certificate = onboarding?.certificate ?? null
-  const expiry = certificate && inst.status === 'Active' ? daysUntil(certificate.expiresAt) : null
   const credential = onboarding?.credential ?? null
   const signingKey = onboarding?.signingKey ?? null
   const config = onboarding?.configuration ?? null
@@ -111,11 +109,6 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
               Usage is recorded but never billed until a rate card takes effect. Rate cards start on the 1st of the current or a future month. <Link to="/staff/rates">Set a rate card</Link>.
             </Banner>
           )}
-          {expiry !== null && expiry <= 30 && (
-            <Banner tone="warn" title={expiry < 0 ? 'Certificate has expired' : `Certificate expires in ${expiry} days`}>
-              Replace it before then so the institution&rsquo;s gateway keeps connecting.
-            </Banner>
-          )}
           {onboardingQuery.isError && <Banner tone="bad" title="Could not load setup details">{errorMessage(onboardingQuery.error)}</Banner>}
 
           {inst.status === 'Pending' && (
@@ -163,30 +156,6 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
                   </>
                 ) : (
                   <Empty>{onboarding ? 'No credentials issued yet.' : 'Loading…'}</Empty>
-                )}
-              </Card>
-
-              <Card>
-                <CardHeader
-                  title="Client certificate"
-                  actions={
-                    canManage && certificate && inst.status !== 'Terminated' ? (
-                      <Button size="sm" onClick={() => run(inst, 'certificate')}>
-                        Replace certificate
-                      </Button>
-                    ) : undefined
-                  }
-                />
-                {certificate ? (
-                  <Facts
-                    rows={[
-                      ['Subject', certificate.subject],
-                      ['Expires', certificate.expiresAt.slice(0, 10)],
-                      ['Thumbprint', <span key="t" className="num text-[12.5px] break-all">{certificate.thumbprintSha256}</span>],
-                    ]}
-                  />
-                ) : (
-                  <Empty>{onboarding ? 'No certificate registered yet.' : 'Loading…'}</Empty>
                 )}
               </Card>
 

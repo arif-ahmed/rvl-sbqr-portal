@@ -19,9 +19,9 @@ describe('toStatus', () => {
 
 describe('toInstitution', () => {
   it('keeps access empty until a Pending institution reaches the credentials step', () => {
-    const early = { ...dto, onboarding: { completedSteps: 1, totalSteps: 6, currentStep: 'CONFIGURATION' as const } }
-    expect(toInstitution(early)).toMatchObject({ id: 'guid-1', access: null, setup: { completed: 1, total: 6, currentStep: 'CONFIGURATION' } })
-    const later = { ...dto, onboarding: { completedSteps: 3, totalSteps: 6, currentStep: 'CERTIFICATE' as const } }
+    const early = { ...dto, onboarding: { completedSteps: 1, totalSteps: 5, currentStep: 'CONFIGURATION' as const } }
+    expect(toInstitution(early)).toMatchObject({ id: 'guid-1', access: null, setup: { completed: 1, total: 5, currentStep: 'CONFIGURATION' } })
+    const later = { ...dto, onboarding: { completedSteps: 3, totalSteps: 5, currentStep: 'SIGNING_KEY' as const } }
     expect(toInstitution(later).access).toEqual({ generation: true, validation: false })
   })
 

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -30,30 +30,23 @@ function open(id: string, role: Role = 'admin', tab: 'overview' | 'usage' | 'bil
 describe('institution detail', () => {
   it('shows setup progress and Continue setup for a pending institution with steps left', async () => {
     open('inst-4')
-    expect(await screen.findByText('3 of 6 done')).toBeInTheDocument()
+    expect(await screen.findByText('3 of 5 done')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue setup' })).toBeInTheDocument()
-    expect(screen.getByText('No certificate registered yet.')).toBeInTheDocument()
     expect(screen.getByText('No signing key yet.')).toBeInTheDocument()
   })
 
-  it('shows the credential, certificate and signing key the API reports', async () => {
+  it('shows the credential and signing key the API reports', async () => {
     open('inst-1')
     expect(await screen.findByText('000901-7c1d9e02')).toBeInTheDocument()
     expect(screen.getByText('Generation · Validation')).toBeInTheDocument()
-    expect(screen.getByText('CN=gateway.shaplabank.example')).toBeInTheDocument()
     expect(screen.getByText(/Key 000901-key, version 1/)).toBeInTheDocument()
     expect(screen.getByText(/cannot be shown again/)).toBeInTheDocument()
-  })
-
-  it('warns about a certificate that is about to expire', async () => {
-    open('inst-2')
-    expect(await screen.findByText(/Certificate expires in 12 days/)).toBeInTheDocument()
   })
 
   it('has no actions once terminated', async () => {
     open('inst-7')
     expect(await screen.findByText('Closed permanently')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /actions|Reactivate|Suspend|Replace certificate/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /actions|Reactivate|Suspend/ })).not.toBeInTheDocument()
   })
 
   it('suspends from the detail page', async () => {
@@ -65,27 +58,9 @@ describe('institution detail', () => {
     expect(backend.callsTo('POST', '/inst-1/suspend')).toHaveLength(1)
   })
 
-  it('replaces the certificate through the API', async () => {
-    const user = open('inst-1')
-    await user.click(await screen.findByRole('button', { name: 'Replace certificate' }))
-    const drawer = await screen.findByRole('dialog')
-    await user.type(within(drawer).getByLabelText('SHA-256 thumbprint'), 'b2'.repeat(32))
-    await user.type(within(drawer).getByLabelText('Subject'), 'CN=new.shaplabank.example')
-    const next = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10)
-    await user.type(within(drawer).getByLabelText('Expires on'), next)
-    await user.click(within(drawer).getByRole('button', { name: 'Replace certificate' }))
-    await waitFor(() => expect(backend.callsTo('POST', '/inst-1/client-certificate')).toHaveLength(1))
-    expect(backend.callsTo('POST', '/inst-1/client-certificate')[0].body).toEqual({
-      thumbprintSha256: 'B2'.repeat(32),
-      subject: 'CN=new.shaplabank.example',
-      expiresAt: `${next}T23:59:59Z`,
-    })
-    expect(await screen.findByText('CN=new.shaplabank.example')).toBeInTheDocument()
-  })
-
   it('is read-only for Finance', async () => {
     open('inst-4', 'finance')
-    await screen.findByText('3 of 6 done')
+    await screen.findByText('3 of 5 done')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -141,7 +116,6 @@ describe('institution detail', () => {
 
   it('activates a pending institution that is ready, and shows why one is not', async () => {
     const ready = backend.find('inst-4')!
-    ready.certSkipped = true
     ready.signingKey = true
     const user = open('inst-4')
     await user.click(await screen.findByRole('button', { name: 'Activate' }))

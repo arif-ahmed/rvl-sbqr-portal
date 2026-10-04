@@ -3,11 +3,11 @@ import type { Blocker } from '../../../../shared/api/client'
 // Wire types for the tenant onboarding API (rvl-secure-bqr-manager, Tenancy module).
 // docs/features/institution-onboarding/implementation-guide.md section 2 is the contract.
 
-export type StepCode = 'PROFILE' | 'CONFIGURATION' | 'CREDENTIALS' | 'CERTIFICATE' | 'SIGNING_KEY' | 'REVIEW'
-export type StepStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
+export type StepCode = 'PROFILE' | 'CONFIGURATION' | 'CREDENTIALS' | 'SIGNING_KEY' | 'REVIEW'
+export type StepStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
 
 /** The onboarding steps in the order the wizard shows them. */
-export const stepOrder: StepCode[] = ['PROFILE', 'CONFIGURATION', 'CREDENTIALS', 'CERTIFICATE', 'SIGNING_KEY', 'REVIEW']
+export const stepOrder: StepCode[] = ['PROFILE', 'CONFIGURATION', 'CREDENTIALS', 'SIGNING_KEY', 'REVIEW']
 
 /** One row of GET /v1/admin/tenants. The two extra fields are the onboarding additions. */
 export type TenantDto = {
@@ -50,7 +50,6 @@ export type OnboardingDto = {
   blockers: Blocker[]
   configuration: { isQrGenerationAllowed: boolean; isQrValidationAllowed: boolean } | null
   credential: { clientId: string; status: string; expiresAt: string | null } | null
-  certificate: { thumbprintSha256: string; subject: string; expiresAt: string } | null
   signingKey: { keyId: string; version: number; status: string } | null
 }
 

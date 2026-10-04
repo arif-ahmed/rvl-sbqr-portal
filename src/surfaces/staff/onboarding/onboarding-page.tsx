@@ -8,25 +8,23 @@ import {
   useInstitution,
   useOnboarding,
   useProvisionCredentials,
-  useRegisterCertificate,
   useRegisterTenant,
   useSaveConfiguration,
-  useSkipCertificate,
   useTenantAction,
 } from '../institutions/api/hooks'
-import { stepLabels, stepStatus, toProfile } from '../institutions/api/mappers'
+import { stepLabels, toProfile } from '../institutions/api/mappers'
 import { stepOrder, type StepCode } from '../institutions/api/types'
 import type { Institution, Profile } from '../institutions/types'
 import { institutionCode } from './institution-types'
 import { SecretDialog } from './secret-dialog'
-import { CertificateStep, ConfigurationStep, CredentialsStep, InstitutionStep, KeyStep, ReviewStep } from './steps'
+import { ConfigurationStep, CredentialsStep, InstitutionStep, KeyStep, ReviewStep } from './steps'
 
 // Institution onboarding. Every step saves to the API as it completes, so closing the tab loses
 // nothing: `?resume=<tenantId>` (from "Continue setup" on a Pending institution) reads the
 // institution's onboarding progress and opens at the first step that is not done.
 // Reached from "Add institution".
 
-const steps: (StepDef & { id: StepCode })[] = stepOrder.map((id) => ({ id, label: stepLabels[id], optional: id === 'CERTIFICATE' }))
+const steps: (StepDef & { id: StepCode })[] = stepOrder.map((id) => ({ id, label: stepLabels[id] }))
 
 /** Where a resumed wizard starts, read once so later refetches never move the user around. */
 type Start = { existing: Institution; step: StepCode; capabilities: { generation: boolean; validation: boolean } }
@@ -82,11 +80,9 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
   const registerTenant = useRegisterTenant()
   const saveConfiguration = useSaveConfiguration()
   const provision = useProvisionCredentials()
-  const registerCertificate = useRegisterCertificate()
-  const skipCertificate = useSkipCertificate()
   const createKey = useCreateSigningKey()
   const activate = useTenantAction()
-  const busy = [registerTenant, saveConfiguration, provision, registerCertificate, skipCertificate, createKey, activate].some((m) => m.isPending)
+  const busy = [registerTenant, saveConfiguration, provision, createKey, activate].some((m) => m.isPending)
 
   const index = steps.findIndex((s) => s.id === stepId)
   const goTo = (id: StepCode) => {
@@ -140,13 +136,6 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
     setShownSecret(null)
     // Drop the mutation result too: it holds the secret for as long as this screen is mounted.
     provision.reset()
-  }
-
-  function skipCert() {
-    if (!tenantId) return
-    if (stepStatus(onboarding, 'CERTIFICATE') === 'SKIPPED') return go(1)
-    setError(null)
-    skipCertificate.mutate({ id: tenantId }, { onSuccess: () => go(1), onError: fail })
   }
 
   function activateInstitution() {
@@ -223,21 +212,6 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
       )}
       {stepId === 'CREDENTIALS' && (
         <CredentialsStep capabilities={config} issued={onboarding?.credential ?? null} busy={busy} error={error} onBack={() => go(-1)} onIssue={issueCredentials} onContinue={() => go(1)} />
-      )}
-      {stepId === 'CERTIFICATE' && (
-        <CertificateStep
-          registered={onboarding?.certificate ?? null}
-          busy={busy}
-          error={error}
-          onBack={() => go(-1)}
-          onSkip={skipCert}
-          onContinue={() => go(1)}
-          onSubmit={(certificate) => {
-            if (!tenantId) return
-            setError(null)
-            registerCertificate.mutate({ id: tenantId, certificate }, { onSuccess: () => go(1), onError: fail })
-          }}
-        />
       )}
       {stepId === 'SIGNING_KEY' && (
         <KeyStep

@@ -2,7 +2,7 @@ import { isStepDone, stepLabels } from './api/mappers'
 import type { OnboardingDto } from './api/types'
 import type { Institution } from './types'
 
-export type ActionId = 'continue' | 'activate' | 'suspend' | 'reactivate' | 'certificate' | 'terminate'
+export type ActionId = 'continue' | 'activate' | 'suspend' | 'reactivate' | 'terminate'
 
 /** The onboarding steps and whether each is done (a skipped optional step counts as done), for the progress card. */
 export function setupItems(onboarding: OnboardingDto | undefined) {
@@ -22,7 +22,7 @@ export function actionsFor(i: Institution): { primary: ActionId | null; menu: Ac
       return { primary: ready ? 'activate' : 'continue', menu: [...(ready ? (['continue'] as const) : []), 'suspend', 'terminate'] }
     }
     case 'Active':
-      return { primary: null, menu: ['certificate', 'suspend', 'terminate'] }
+      return { primary: null, menu: ['suspend', 'terminate'] }
     case 'Suspended':
       return { primary: 'reactivate', menu: ['terminate'] }
     case 'Terminated':
@@ -35,12 +35,8 @@ export const actionLabel: Record<ActionId, string> = {
   activate: 'Activate',
   suspend: 'Suspend',
   reactivate: 'Reactivate',
-  certificate: 'Replace certificate',
   terminate: 'Terminate',
 }
-
-/** Whole days until an ISO date (negative if past). */
-export const daysUntil = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
 
 /** What to flag under an institution's name: unfinished setup, or a live institution that cannot be billed. */
 export function institutionNote(inst: Institution): { text: string; warn: boolean } | null {
