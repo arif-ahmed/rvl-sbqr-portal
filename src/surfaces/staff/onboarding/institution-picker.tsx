@@ -48,10 +48,18 @@ export function InstitutionPicker(props: {
   }
 
   const q = query.trim().toLowerCase()
-  const matches = entries.filter((e) => !q || e.name.toLowerCase().includes(q) || codeOf(e).startsWith(q))
+  // When there is no query, show the full directory so the admin can scan every
+  // option — available and locked rows live in the same list. When the admin
+  // types, narrow to matches in any group.
+  const matches = q
+    ? entries.filter((e) => e.name.toLowerCase().includes(q) || codeOf(e).startsWith(q))
+    : entries
   const isTaken = (e: RegistryEntry) => taken.includes(codeOf(e))
   const isFrozen = (e: RegistryEntry) => frozen.includes(codeOf(e))
   const blocked = (e: RegistryEntry) => isTaken(e) || isFrozen(e)
+  // One flat list, sorted by name, so available and locked rows alternate by
+  // what the admin is scanning for, not by registry order.
+  const ordered = [...matches].sort((a, b) => a.name.localeCompare(b.name))
 
   function choose(e: RegistryEntry) {
     if (blocked(e)) return
@@ -68,7 +76,7 @@ export function InstitutionPicker(props: {
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined}
+        aria-activedescendant={open && ordered[active] ? `${listId}-${active}` : undefined}
         aria-invalid={invalid}
         autoComplete="off"
         placeholder="Search by name or code"
@@ -84,13 +92,13 @@ export function InstitutionPicker(props: {
           if (e.key === 'ArrowDown') {
             e.preventDefault()
             setOpen(true)
-            setActive((a) => Math.min(matches.length - 1, a + 1))
+            setActive((a) => Math.min(ordered.length - 1, a + 1))
           } else if (e.key === 'ArrowUp') {
             e.preventDefault()
             setActive((a) => Math.max(0, a - 1))
-          } else if (e.key === 'Enter' && open && matches[active]) {
+          } else if (e.key === 'Enter' && open && ordered[active]) {
             e.preventDefault()
-            choose(matches[active])
+            choose(ordered[active])
           } else if (e.key === 'Escape') {
             setOpen(false)
           }
@@ -98,27 +106,43 @@ export function InstitutionPicker(props: {
       />
       {open && (
         <ul id={listId} role="listbox" aria-label="Institutions" className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg">
-          {matches.length === 0 && <li className="px-4 py-3 text-text-3">No institution matches. Use “Not listed” below.</li>}
-          {matches.map((e, i) => (
-            <li
-              key={codeOf(e)}
-              id={`${listId}-${i}`}
-              role="option"
-              aria-selected={i === active}
-              aria-disabled={blocked(e)}
-              // mousedown, not click: the input would blur and close the list first.
-              onMouseDown={(ev) => {
-                ev.preventDefault()
-                choose(e)
-              }}
-              className={cn('flex items-center justify-between gap-3 px-4 py-2.5', i === active && 'bg-surface-2', blocked(e) ? 'cursor-not-allowed text-text-3' : 'cursor-pointer')}
-            >
-              <span className="min-w-0 truncate">{e.name}</span>
-              <span className="shrink-0 text-[12.5px] text-text-3">
-                {isTaken(e) ? 'Already onboarded' : isFrozen(e) ? 'Trust inactive' : typeLabel(e.type).split(' (')[0]} · <span className="num">{codeOf(e)}</span>
-              </span>
-            </li>
-          ))}
+          {ordered.length === 0 && <li className="px-4 py-3 text-text-3">No institution matches. Use “Not listed” below.</li>}
+          {ordered.map((e, i) => {
+            const taken = isTaken(e)
+            const frozen = !taken && isFrozen(e)
+            const locked = taken || frozen
+            return (
+              <li
+                key={codeOf(e)}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === active}
+                aria-disabled={locked}
+                // mousedown, not click: the input would blur and close the list first.
+                onMouseDown={(ev) => {
+                  ev.preventDefault()
+                  choose(e)
+                }}
+                className={cn(
+                  'flex items-center justify-between gap-3 px-4 py-2.5',
+                  i === active && 'bg-surface-2',
+                  locked ? 'cursor-not-allowed text-text-3' : 'cursor-pointer',
+                )}
+              >
+                <span className="min-w-0 truncate">
+                  {e.name}
+                  {locked && (
+                    <span className="ml-2 inline-block rounded-md bg-surface-2 px-1.5 py-0.5 align-middle text-[11px] font-medium text-text-2">
+                      {taken ? 'Already onboarded' : 'Trust inactive'}
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 text-[12.5px] text-text-3">
+                  {typeLabel(e.type).split(' (')[0]} · <span className="num">{codeOf(e)}</span>
+                </span>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
