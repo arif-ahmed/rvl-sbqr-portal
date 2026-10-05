@@ -22,8 +22,17 @@ export function toRegistryEntry(e: DirectoryEntry): RegistryEntry {
   }
 }
 
+/** The trust directory only lists institutions that already published a key, so on its own it
+ *  can never offer a new institution. Start from the full Annex A registry and let live rows
+ *  win on name and trust status; institutions the directory has but Annex A lacks are added. */
+export function mergeDirectory(rows: DirectoryEntry[]): RegistryEntry[] {
+  const byCode = new Map(institutionRegistry.map((e) => [`${e.type}${e.id}`, e]))
+  for (const r of rows) byCode.set(r.institutionCode, toRegistryEntry(r))
+  return [...byCode.values()]
+}
+
 export type DirectoryState = {
-  /** Live rows from the API, or the static registry when unreachable. */
+  /** Annex A registry overlaid with live rows from the API, or the registry alone when unreachable. */
   entries: RegistryEntry[]
   /** True when entries came from the API. */
   live: boolean
@@ -47,7 +56,7 @@ export function useInstitutionDirectory(): DirectoryState {
       .then((rows) => {
         if (cancelled) return
         setState({
-          entries: rows.map(toRegistryEntry),
+          entries: mergeDirectory(rows),
           live: true,
           frozen: rows.filter((r) => r.status !== 'ACTIVE').map((r) => r.institutionCode),
         })

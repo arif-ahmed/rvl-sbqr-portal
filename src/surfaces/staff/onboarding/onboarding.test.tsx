@@ -72,17 +72,13 @@ describe('institution onboarding: the first step', () => {
     expect(screen.getByRole('combobox')).toBeInTheDocument()
   })
 
-  it('rejects a manually entered code that is already registered', async () => {
+  it('keeps the list open when the mouse goes down on the list itself (scrollbar, padding)', async () => {
     const user = setup()
-    await screen.findByRole('combobox')
-    await waitFor(() => expect(backend.callsTo('GET', '/v1/admin/tenants?')).toHaveLength(1))
-    await click(user, 'Not listed? Enter details manually')
-    await user.type(screen.getByLabelText('Institution name'), 'Shapla Commercial Bank')
-    await user.selectOptions(screen.getByLabelText('Institution type'), '00')
-    await user.type(screen.getByLabelText('Institution ID'), '0901')
-    await fillContact(user)
-    expect(await screen.findByText('This institution code is already registered.')).toBeInTheDocument()
-    expect(backend.callsTo('POST', '/v1/admin/tenants')).toHaveLength(0)
+    const input = await screen.findByRole('combobox')
+    await user.click(input)
+    await user.pointer({ keys: '[MouseLeft>]', target: await screen.findByRole('listbox') })
+    expect(input).toHaveFocus()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
   })
 
   it('registers the institution through the API and moves on to Configuration', async () => {

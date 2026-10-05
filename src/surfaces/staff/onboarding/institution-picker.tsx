@@ -57,9 +57,9 @@ export function InstitutionPicker(props: {
   const isTaken = (e: RegistryEntry) => taken.includes(codeOf(e))
   const isFrozen = (e: RegistryEntry) => frozen.includes(codeOf(e))
   const blocked = (e: RegistryEntry) => isTaken(e) || isFrozen(e)
-  // One flat list, sorted by name, so available and locked rows alternate by
-  // what the admin is scanning for, not by registry order.
-  const ordered = [...matches].sort((a, b) => a.name.localeCompare(b.name))
+  // One flat list in institution-code order (the Bangladesh Bank directory order), so
+  // available and locked rows interleave exactly as the regulator lists them.
+  const ordered = [...matches].sort((a, b) => codeOf(a).localeCompare(codeOf(b)))
 
   function choose(e: RegistryEntry) {
     if (blocked(e)) return
@@ -105,8 +105,15 @@ export function InstitutionPicker(props: {
         }}
       />
       {open && (
-        <ul id={listId} role="listbox" aria-label="Institutions" className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg">
-          {ordered.length === 0 && <li className="px-4 py-3 text-text-3">No institution matches. Use “Not listed” below.</li>}
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label="Institutions"
+          // Keep focus on the input while the list is used: grabbing the scrollbar or the
+          // list's padding would otherwise blur the input and close the list under the cursor.
+          onMouseDown={(ev) => ev.preventDefault()}
+          className="absolute z-20 mt-1 max-h-[min(30rem,60vh)] w-full overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg">
+          {ordered.length === 0 && <li className="px-4 py-3 text-text-3">No institution matches.</li>}
           {ordered.map((e, i) => {
             const taken = isTaken(e)
             const frozen = !taken && isFrozen(e)

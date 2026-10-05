@@ -1,15 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState, type ReactNode } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import type { Blocker } from '../../../shared/api/client'
-import { Banner, Button, Card, Field, Input, Select, StatusChip, SwitchRow, Textarea } from '../../../shared/ui'
+import { Banner, Button, Card, Field, Input, StatusChip, SwitchRow, Textarea } from '../../../shared/ui'
 import { useInstitutions } from '../institutions/api/hooks'
 import type { OnboardingDto } from '../institutions/api/types'
 import type { KeyMode, Profile } from '../institutions/types'
 import { InstitutionPicker } from './institution-picker'
 import { type RegistryEntry } from './institution-registry'
-import { institutionCode, institutionTypes, typeLabel } from './institution-types'
+import { institutionCode, typeLabel } from './institution-types'
 import { useInstitutionDirectory } from './use-institution-directory'
 
 // The wizard steps. Each one is a plain form: the page owns the requests (see onboarding-page.tsx)
@@ -57,18 +57,17 @@ export function InstitutionStep(props: StepState & { initial: Profile | null; lo
     defaultValues: initial ?? { name: '', type: '', institutionId: '', contactName: '', email: '', phone: '', address: '' },
   })
   const { errors } = form.formState
-  const [type, institutionId] = useWatch({ control: form.control, name: ['type', 'institutionId'] })
   // Codes already registered: the picker greys them out. The API still refuses a duplicate with a 409.
   const taken = useInstitutions().map((i) => i.code)
 
-  // The name is fixed by the regulator, so it is picked from the directory rather than typed.
-  // "Not listed" falls back to manual entry (also the only way to add an NBFI).
+  // The name is fixed by the regulator, so it is always picked from the directory, never typed.
   // The directory is live from GET /v1/admin/institutions with the static Annex A
   // registry as fallback when the API is unreachable.
   const directory = useInstitutionDirectory()
-  const inRegistry = (p: Profile | null) => directory.entries.find((e) => p && e.type === p.type && e.id === p.institutionId) ?? null
-  const [picked, setPicked] = useState<RegistryEntry | null>(() => inRegistry(initial))
-  const [manual, setManual] = useState(() => !!initial && !inRegistry(initial))
+  // A resumed institution is shown as saved even if the directory no longer lists it.
+  const [picked, setPicked] = useState<RegistryEntry | null>(() =>
+    initial ? (directory.entries.find((e) => e.type === initial.type && e.id === initial.institutionId) ?? { name: initial.name, type: initial.type, id: initial.institutionId }) : null,
+  )
 
   function setIdentity(name: string, t: string, id: string) {
     const opts = { shouldValidate: form.formState.isSubmitted }
@@ -91,76 +90,29 @@ export function InstitutionStep(props: StepState & { initial: Profile | null; lo
       {locked && <Banner tone="info" title="Institution registered">Identity details are fixed once registered.</Banner>}
       <form onSubmit={form.handleSubmit(submit)} noValidate>
         <fieldset disabled={locked} className="min-w-0">
-          {manual ? (
-            <>
-              <Field label="Institution name" htmlFor="name" error={errors.name?.message} hint="Enter it exactly as registered with Bangladesh Bank.">
-                <Input id="name" autoComplete="off" aria-invalid={!!errors.name} {...form.register('name')} />
-              </Field>
-              <div className="grid gap-x-4 sm:grid-cols-2">
-                <Field label="Institution type" htmlFor="type" error={errors.type?.message} hint="As defined by Bangladesh Bank.">
-                  <Select id="type" aria-invalid={!!errors.type} {...form.register('type')}>
-                    <option value="">Select type</option>
-                    {institutionTypes.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field
-                  label="Institution ID"
-                  htmlFor="institutionId"
-                  error={errors.institutionId?.message}
-                  hint={type && /^\d{4}$/.test(institutionId) ? `Institution code ${institutionCode(type, institutionId)}` : 'Type code + 4-digit ID makes the 6-digit code.'}
-                >
-                  <div className="flex">
-                    <span className="num grid h-10 min-w-11 place-items-center rounded-l-[9px] border border-r-0 border-line-2 bg-surface-2 px-2.5 text-text-2">
-                      {type || '--'}
-                    </span>
-                    <Input id="institutionId" inputMode="numeric" maxLength={4} className="num rounded-l-none" aria-invalid={!!errors.institutionId} {...form.register('institutionId')} />
-                  </div>
-                </Field>
-              </div>
-            </>
-          ) : (
-            <Field
-              label="Institution"
-              htmlFor="institution"
-              error={errors.name || errors.type || errors.institutionId ? 'Choose an institution from the list.' : undefined}
-              hint={
-                directory.live
-                  ? 'Registered Bangla QR institutions. Choosing one fills in its type and code.'
-                  : 'Trust directory unreachable — showing the built-in list. Choosing one fills in its type and code.'
-              }
-            >
-              <InstitutionPicker
-                value={picked}
-                disabled={locked}
-                invalid={!!(errors.name || errors.institutionId)}
-                entries={directory.entries}
-                taken={taken}
-                frozen={directory.frozen}
-                onChange={(e) => {
-                  setPicked(e)
-                  setIdentity(e?.name ?? '', e?.type ?? '', e?.id ?? '')
-                }}
-              />
-            </Field>
-          )}
-          {!locked && (
-            <button
-              type="button"
-              className="-mt-2 mb-4 text-[13px] font-medium text-accent-strong underline"
-              onClick={() => {
-                setManual(!manual)
-                setPicked(null)
-                setIdentity('', '', '')
-                form.clearErrors()
+          <Field
+            label="Institution"
+            htmlFor="institution"
+            error={errors.name || errors.type || errors.institutionId ? 'Choose an institution from the list.' : undefined}
+            hint={
+              directory.live
+                ? 'Registered Bangla QR institutions. Choosing one fills in its type and code.'
+                : 'Trust directory unreachable — showing the built-in list. Choosing one fills in its type and code.'
+            }
+          >
+            <InstitutionPicker
+              value={picked}
+              disabled={locked}
+              invalid={!!(errors.name || errors.institutionId)}
+              entries={directory.entries}
+              taken={taken}
+              frozen={directory.frozen}
+              onChange={(e) => {
+                setPicked(e)
+                setIdentity(e?.name ?? '', e?.type ?? '', e?.id ?? '')
               }}
-            >
-              {manual ? 'Choose from the list instead' : 'Not listed? Enter details manually'}
-            </button>
-          )}
+            />
+          </Field>
           <div className="grid gap-x-4 sm:grid-cols-2">
             <Field label="Contact name" htmlFor="contactName" error={errors.contactName?.message}>
               <Input id="contactName" autoComplete="off" aria-invalid={!!errors.contactName} {...form.register('contactName')} />
