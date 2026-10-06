@@ -18,7 +18,7 @@ npm ci
 npm run dev            # http://localhost:5175
 ```
 
-Sign-in exchanges API client credentials at `POST /v1/oauth/token` (OAuth 2.1 client-credentials): the login form's Client ID / Client secret are the `client_id` / `client_secret`, and the minted bearer token — held in memory only — authenticates later `/v1` calls and is re-minted 30s before it expires. For the prototype phase `.env.example` also sets `VITE_MOCK_AUTH=true`, which replaces the form with demo accounts (password `Demo@1234`); leave that flag off in production.
+Sign-in exchanges API client credentials at `POST /v1/oauth/token` (OAuth 2.1 client-credentials): the login form's Client ID / Client secret are the `client_id` / `client_secret`, and the minted bearer token — held in memory only — authenticates later `/v1` calls and is re-minted 30s before it expires. RVL staff sign in with the platform bootstrap client (`platform_bootstrap`); an institution signs in with the client provisioned for it. There are no per-user accounts and no mock data: every screen reads the API.
 
 | Command | What it does |
 |---|---|
@@ -29,7 +29,7 @@ Sign-in exchanges API client credentials at `POST /v1/oauth/token` (OAuth 2.1 cl
 
 ## Status
 
-Shell built. Sign-in, the role-aware layout and per-role navigation work; each screen is a "Not built yet" placeholder. `design/portal-prototype.html` is a clickable prototype of every screen (open it in a browser; demo password `Demo@1234`).
+Shell built. Sign-in, the role-aware layout and per-role navigation work; each screen is a "Not built yet" placeholder. `design/portal-prototype.html` is a clickable prototype of every screen (open it in a browser).
 
 ## Layout
 
@@ -40,7 +40,7 @@ src/
   surfaces/staff/     RVL Admin and Finance screens
   surfaces/fi/        Institution screens
   pages/login.tsx     sign-in for both audiences
-  shared/auth         in-memory session, sign-in (client credentials; demo accounts behind VITE_MOCK_AUTH)
+  shared/auth         in-memory session, sign-in (client credentials)
   shared/layout       AppShell (sidebar, top bar), ComingSoon placeholder
   shared/ui           design-system components
   shared/             format helpers, cn, theme

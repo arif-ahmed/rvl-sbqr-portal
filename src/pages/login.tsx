@@ -75,7 +75,7 @@ export default function LoginPage() {
       <section className="grid place-items-center p-8">
         <div className="w-full max-w-[420px]">
           <h1 className="mb-1.5 font-head text-[26px] leading-8 font-bold tracking-tight">Sign in</h1>
-          <p className="mb-6 text-text-2">{surface === 'fi' ? 'Institution portal for Secure Bangla QR.' : 'RVL staff console for operations and finance.'}</p>
+          <p className="mb-6 text-text-2">{surface === 'fi' ? 'Institution portal for Secure Bangla QR.' : 'RVL staff console for operations and billing.'}</p>
 
           <div role="tablist" aria-label="Sign in as" className="mb-6 grid grid-cols-2 rounded-[11px] bg-line p-1">
             {(['fi', 'staff'] as const).map((s) => (
@@ -118,36 +118,8 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {import.meta.env.VITE_MOCK_AUTH === 'true' && <DemoAccounts surface={surface} onPick={(id, pw) => { form.setValue('clientId', id); form.setValue('clientSecret', pw) }} />}
         </div>
       </section>
-    </div>
-  )
-}
-
-function DemoAccounts({ surface, onPick }: { surface: Surface; onPick: (id: string, pw: string) => void }) {
-  // Dynamic import keeps the demo accounts out of builds that don't enable mock auth.
-  const [demo, setDemo] = useState<typeof import('../shared/auth/mock') | null>(null)
-  useEffect(() => {
-    import('../shared/auth/mock').then(setDemo)
-  }, [])
-  if (!demo) return null
-  const shown = demo.demoAccounts.filter((a) => a.surface === surface)
-  return (
-    <div className="mt-6 border-t border-line pt-4">
-      <small className="mb-2.5 block text-text-3">Prototype demo accounts (password {demo.DEMO_PASSWORD})</small>
-      <div className="flex flex-wrap gap-2">
-        {shown.map((a) => (
-          <button
-            key={a.userId}
-            type="button"
-            onClick={() => onPick(a.userId, demo.DEMO_PASSWORD)}
-            className="h-8 rounded-full border border-line-2 bg-surface px-3 text-[12.5px] font-medium hover:border-accent"
-          >
-            {a.label}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

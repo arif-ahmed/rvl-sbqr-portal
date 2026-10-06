@@ -1,7 +1,6 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import type { Role } from '../../shared/auth/session'
 import { errorMessage } from '../../shared/api/client'
 import { Banner, Card, EmptyRow, Input, Select, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
 import { institutionNote } from './institutions/actions'
@@ -14,11 +13,10 @@ import { institutionTypes, typeLabel } from './onboarding/institution-types'
 const statuses: InstitutionStatus[] = ['Pending', 'Active', 'Suspended', 'Terminated']
 
 /** Institutions list, read from the tenants API. Lifecycle actions call the API and the list refetches. */
-export function InstitutionsPage({ role }: { role: Role }) {
+export function InstitutionsPage() {
   const navigate = useNavigate()
   const list = useInstitutionList()
   const institutions = list.data ?? []
-  const canManage = role === 'admin'
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')
@@ -48,14 +46,12 @@ export function InstitutionsPage({ role }: { role: Role }) {
           ))}
         </Select>
         <span className="flex-1" />
-        {canManage && (
-          <Link
-            to="/staff/institutions/new"
-            className="inline-flex h-[38px] items-center gap-2 rounded-[9px] border border-accent bg-accent px-4 font-medium text-on-accent hover:border-accent-strong hover:bg-accent-strong"
-          >
-            <Plus className="size-4" aria-hidden /> Add institution
-          </Link>
-        )}
+        <Link
+          to="/staff/institutions/new"
+          className="inline-flex h-[38px] items-center gap-2 rounded-[9px] border border-accent bg-accent px-4 font-medium text-on-accent hover:border-accent-strong hover:bg-accent-strong"
+        >
+          <Plus className="size-4" aria-hidden /> Add institution
+        </Link>
       </div>
 
       {list.isError && (
@@ -76,12 +72,12 @@ export function InstitutionsPage({ role }: { role: Role }) {
               <Th>Code</Th>
               <Th>Access</Th>
               <Th>Status</Th>
-              {canManage && <Th right>Actions</Th>}
+              <Th right>Actions</Th>
             </tr>
           </thead>
           <tbody>
-            {list.isPending && <EmptyRow cols={canManage ? 6 : 5} title="Loading institutions…" />}
-            {!list.isPending && !list.isError && rows.length === 0 && <EmptyRow cols={canManage ? 6 : 5} title="No institutions match" hint="Clear the search or filters." />}
+            {list.isPending && <EmptyRow cols={6} title="Loading institutions…" />}
+            {!list.isPending && !list.isError && rows.length === 0 && <EmptyRow cols={6} title="No institutions match" hint="Clear the search or filters." />}
             {rows.map((inst) => {
               const note = institutionNote(inst)
               return (
@@ -101,11 +97,9 @@ export function InstitutionsPage({ role }: { role: Role }) {
                   <Td>
                     <StatusChip status={inst.status} />
                   </Td>
-                  {canManage && (
-                    <Td>
-                      <ActionButtons inst={inst} onAction={run} />
-                    </Td>
-                  )}
+                  <Td>
+                    <ActionButtons inst={inst} onAction={run} />
+                  </Td>
                 </Tr>
               )
             })}

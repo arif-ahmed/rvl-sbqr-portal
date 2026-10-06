@@ -2,7 +2,6 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { Role } from '../../../shared/auth/session'
 import { FakeBackend, installFakeBackend } from '../../../test/fake-backend'
 import { renderApp } from '../../../test/providers'
 import { InstitutionDetail } from './institution-detail'
@@ -14,13 +13,13 @@ beforeEach(async () => {
 afterEach(() => backend.reset())
 
 /** Open an institution by its seeded id ('inst-1' is Shapla, 'inst-4' is Surma, ...). */
-function open(id: string, role: Role = 'admin', tab: 'overview' | 'usage' | 'billing' = 'overview') {
+function open(id: string, tab: 'overview' | 'usage' | 'billing' = 'overview') {
   renderApp(
     <Routes>
       <Route path="/staff/institutions" element={<p>list</p>} />
-      <Route path="/staff/institutions/:id" element={<InstitutionDetail role={role} />} />
-      <Route path="/staff/institutions/:id/usage" element={<InstitutionDetail role={role} tab="usage" />} />
-      <Route path="/staff/institutions/:id/billing" element={<InstitutionDetail role={role} tab="billing" />} />
+      <Route path="/staff/institutions/:id" element={<InstitutionDetail />} />
+      <Route path="/staff/institutions/:id/usage" element={<InstitutionDetail tab="usage" />} />
+      <Route path="/staff/institutions/:id/billing" element={<InstitutionDetail tab="billing" />} />
     </Routes>,
     [`/staff/institutions/${id}${tab === 'usage' ? '/usage' : tab === 'billing' ? '/billing' : ''}`],
   )
@@ -58,12 +57,6 @@ describe('institution detail', () => {
     expect(backend.callsTo('POST', '/inst-1/suspend')).toHaveLength(1)
   })
 
-  it('is read-only for Finance', async () => {
-    open('inst-4', 'finance')
-    await screen.findByText('3 of 5 done')
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
-  })
-
   it('switches between Overview and Usage for an active institution', async () => {
     const user = open('inst-1')
     await user.click(await screen.findByRole('link', { name: 'Usage' }))
@@ -72,11 +65,6 @@ describe('institution detail', () => {
     expect(screen.queryByRole('columnheader', { name: 'Institution' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Overview' }))
     expect(await screen.findByText('API credentials')).toBeInTheDocument()
-  })
-
-  it('shows Finance the Usage tab', async () => {
-    open('inst-2', 'finance', 'usage')
-    expect(await screen.findByLabelText('Meter')).toBeInTheDocument()
   })
 
   it('warns on the overview and the Usage tab when a live institution has no rate card', async () => {
@@ -88,7 +76,7 @@ describe('institution detail', () => {
   })
 
   it('has no rate card notice for an institution that has one', async () => {
-    open('inst-1', 'admin', 'usage')
+    open('inst-1', 'usage')
     await screen.findByLabelText('Meter')
     expect(screen.queryByText('No rate card')).not.toBeInTheDocument()
   })
@@ -96,7 +84,7 @@ describe('institution detail', () => {
   it('shows the API rate card in effect on the billing tab when one exists', async () => {
     // inst-1 is seeded with two cards: YYYY-01-01 (in effect) and nextMonth-01 (scheduled).
     const year = new Date().getFullYear()
-    open('inst-1', 'admin', 'billing')
+    open('inst-1', 'billing')
     // The Generation/Validation <dd>s only render when a card is found.
     expect(await screen.findByText('৳ 0.50 / call')).toBeInTheDocument()
     expect(screen.getByText('৳ 0.125 / call')).toBeInTheDocument()
@@ -108,7 +96,7 @@ describe('institution detail', () => {
 
   it('shows the no-rate-card empty state on the billing tab when the API has no cards', async () => {
     // inst-3 has no rate cards in the seed, and the API confirms it.
-    open('inst-3', 'admin', 'billing')
+    open('inst-3', 'billing')
     expect(await screen.findByText('No rate card')).toBeInTheDocument()
     expect(screen.queryByText('৳ 0.50 / call')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Manage rate cards/ })).toBeInTheDocument()
@@ -125,7 +113,7 @@ describe('institution detail', () => {
   })
 
   it('has no Usage tab for a pending institution, even by URL', async () => {
-    open('inst-4', 'admin', 'usage')
+    open('inst-4', 'usage')
     expect(await screen.findByText('Setup progress')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Usage' })).not.toBeInTheDocument()
   })

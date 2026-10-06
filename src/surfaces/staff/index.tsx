@@ -13,10 +13,10 @@ import { StatementPage } from './periods/statement-page'
 import { RatesPage } from './rates/rates-page'
 import { ReportsPage } from './reports/reports-page'
 
-// RVL Admin and Finance screens. Reference: design/portal-prototype.html.
+// RVL staff screens (the platform admin). Reference: design/portal-prototype.html.
 // To build a screen: create it in this folder and swap it in for <ComingSoon /> below.
 export default function StaffSurface({ session }: { session: Session }) {
-  const nav = staffNav(session.role)
+  const nav = staffNav()
   const pages = nav.flatMap((n) => ('to' in n ? [n] : []))
   const shell = (title: string, children: React.ReactNode) => (
     <AppShell surface="staff" session={session} nav={nav} title={title}>
@@ -25,7 +25,7 @@ export default function StaffSurface({ session }: { session: Session }) {
   )
   const page = (to: string, label: string) => {
     if (to === '/staff/overview') return <OverviewPage session={session} />
-    if (to === '/staff/institutions') return <InstitutionsPage role={session.role} />
+    if (to === '/staff/institutions') return <InstitutionsPage />
     if (to === '/staff/rates') return <RatesPage />
     if (to === '/staff/periods') return <PeriodsPage session={session} />
     if (to === '/staff/adjustments') return <AdjustmentsPage session={session} />
@@ -41,17 +41,13 @@ export default function StaffSurface({ session }: { session: Session }) {
           element={shell(p.label, page(p.to, p.label))}
         />
       ))}
-      {/* Admin only; Finance goes back to the list (not on to institutions/:id, which would ask the API for a tenant called "new"). The API enforces this too. */}
-      <Route
-        path="institutions/new"
-        element={session.role === 'admin' ? shell('New institution', <OnboardingPage />) : <Navigate to="/staff/institutions" replace />}
-      />
+      <Route path="institutions/new" element={shell('New institution', <OnboardingPage />)} />
       <Route path="periods/:period/statements/:institutionId" element={shell('Statement', <StatementPage />)} />
       <Route path="reports/institution" element={shell('Reports', <ReportsPage view="institution" />)} />
       <Route path="reports/trend" element={shell('Reports', <ReportsPage view="trend" />)} />
-      <Route path="institutions/:id" element={shell('Institution', <InstitutionDetail role={session.role} />)} />
-      <Route path="institutions/:id/usage" element={shell('Institution', <InstitutionDetail role={session.role} tab="usage" />)} />
-      <Route path="institutions/:id/billing" element={shell('Institution', <InstitutionDetail role={session.role} tab="billing" />)} />
+      <Route path="institutions/:id" element={shell('Institution', <InstitutionDetail />)} />
+      <Route path="institutions/:id/usage" element={shell('Institution', <InstitutionDetail tab="usage" />)} />
+      <Route path="institutions/:id/billing" element={shell('Institution', <InstitutionDetail tab="billing" />)} />
       <Route path="*" element={<Navigate to="/staff/overview" replace />} />
     </Routes>
   )

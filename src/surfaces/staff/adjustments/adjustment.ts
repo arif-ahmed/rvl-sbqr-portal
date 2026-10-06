@@ -9,7 +9,6 @@ const amount = z
 
 export const adjustmentSchema = z.object({
   institutionId: z.string().min(1, 'Choose an institution.'),
-  period: z.string().min(1, 'Choose a period.'),
   amount,
   reason: z.string().trim().min(8, 'Give a reason of at least 8 characters.'),
 })

@@ -85,19 +85,6 @@ export function billingReason(e: Pick<UsageEvent, 'billable' | 'verdict'>) {
   return { billed: e.billable, short: e.billable ? 'Billed' : info.short, why: info.why, rejection: !!info.rejection }
 }
 
-export type UsageSummary = { staticGen: number; dynamicGen: number; validations: number; billable: number; total: number }
-
-export function summarize(events: UsageEvent[]): UsageSummary {
-  const count = (m: Meter) => events.filter((e) => e.meter === m).length
-  return {
-    staticGen: count('GENERATION_STATIC'),
-    dynamicGen: count('GENERATION_DYNAMIC'),
-    validations: count('VALIDATION'),
-    billable: events.filter((e) => e.billable).length,
-    total: events.length,
-  }
-}
-
 export type UsageFilters = {
   meter: '' | Meter
   billing: '' | 'billable' | 'free'
@@ -109,19 +96,6 @@ export type UsageFilters = {
 export const noFilters: UsageFilters = { meter: '', billing: '', from: '', to: '' }
 
 export const hasFilters = (f: UsageFilters) => Object.values(f).some(Boolean)
-
-export function filterEvents(events: UsageEvent[], f: UsageFilters): UsageEvent[] {
-  return events.filter(
-    (e) =>
-      (!f.meter || e.meter === f.meter) &&
-      (!f.billing || e.billable === (f.billing === 'billable')) &&
-      (!f.from || e.at.slice(0, 10) >= f.from) &&
-      (!f.to || e.at.slice(0, 10) <= f.to),
-  )
-}
-
-/** The billing period an event falls in, e.g. '2026-09'. */
-export const eventPeriod = (e: Pick<UsageEvent, 'at'>) => e.at.slice(0, 7)
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 

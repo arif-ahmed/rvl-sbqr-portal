@@ -1,38 +1,48 @@
 import { Lock } from 'lucide-react'
 import { useState } from 'react'
+import { errorMessage } from '../../../shared/api/client'
 import type { Session } from '../../../shared/auth/session'
 import { bdt, bdtSigned, periodName } from '../../../shared/format'
 import { Banner, Button, Drawer, Field, Input, toast } from '../../../shared/ui'
 import type { Period, PeriodTotals } from '../../../shared/billing/billing'
-import { finalizePeriod } from '../../../shared/billing/store'
+import { useFinalizePeriod } from '../billing/api/hooks'
 
 /** The typed-total keeps a reviewed month and a changed month from both being "approved". */
 const matches = (typed: string, total: number) => parseFloat(typed.replace(/,/g, '')) === total
 
 /**
  * Month close as a deliberate act: review the totals, retype the expected total, then the month
- * locks and its pending adjustments settle onto the statements. UI only: calls the in-memory store.
+ * locks and its pending adjustments settle onto the statements. The API refuses when usage is still
+ * outstanding or when the totals changed since review.
  */
 export function FinalizeDrawer({ period, totals, session, onClose }: { period: Period; totals: PeriodTotals; session: Session; onClose: () => void }) {
   const [typed, setTyped] = useState('')
   const [blocked, setBlocked] = useState(false)
+  const finalize = useFinalizePeriod()
   const ready = typed !== '' && matches(typed, totals.total)
 
-  const confirm = () => {
-    const outcome = finalizePeriod(period, totals.total, session.userId)
-    if (outcome === 'Finalized') {
-      toast.success(`${periodName(period)} finalized`)
-      onClose()
-      return
-    }
-    if (outcome === 'UsageNotComplete') {
-      setBlocked(true)
-      return
-    }
-    if (outcome === 'DraftChanged') toast.error('Totals changed since review. Recalculate, then try again.')
-    else toast.error('This period is already finalized.')
-    onClose()
-  }
+  const confirm = () =>
+    finalize.mutate(
+      { period, expectedTotal: totals.total, finalizedBy: session.userId },
+      {
+        onSuccess: (outcome) => {
+          if (outcome === 'Finalized') {
+            toast.success(`${periodName(period)} finalized`)
+            onClose()
+            return
+          }
+          if (outcome === 'UsageNotComplete') {
+            setBlocked(true)
+            return
+          }
+          if (outcome === 'DraftChanged') toast.error('Totals changed since review. The draft was rebuilt: review the new total, then try again.')
+          else if (outcome === 'PeriodNotReady') toast.error('This month has no draft yet. Create the draft first.')
+          else toast.success('This period was already finalized.')
+          onClose()
+        },
+        onError: (e) => toast.error(errorMessage(e, 'Could not finalize the period.')),
+      },
+    )
 
   return (
     <Drawer
@@ -42,7 +52,7 @@ export function FinalizeDrawer({ period, totals, session, onClose }: { period: P
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={!ready} onClick={confirm}>
+          <Button variant="primary" disabled={!ready || finalize.isPending} onClick={confirm}>
             Finalize period
           </Button>
         </>
@@ -53,8 +63,8 @@ export function FinalizeDrawer({ period, totals, session, onClose }: { period: P
       </Banner>
 
       {blocked && (
-        <Banner tone="bad" title="409 · USAGE_NOT_COMPLETE">
-          Usage events have not been delivered. Close this panel, requeue them from the banner on the page, then try again.
+        <Banner tone="bad" title="Usage not complete">
+          Some usage events have not been recorded yet. Close this panel, requeue any dead-lettered events from the banner on the page, wait for the rest to be delivered, then try again.
         </Banner>
       )}
 
@@ -87,7 +97,7 @@ export function FinalizeDrawer({ period, totals, session, onClose }: { period: P
         />
       </Field>
 
-      <Field label="Finalized by" htmlFor="finalize-by" hint="Taken from your signed-in account.">
+      <Field label="Finalized by" htmlFor="finalize-by" hint="Taken from your signed-in credential.">
         <Input id="finalize-by" value={session.userId} readOnly />
       </Field>
 

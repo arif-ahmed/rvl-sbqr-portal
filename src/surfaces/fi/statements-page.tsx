@@ -1,15 +1,19 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { institutionStatements } from '../../shared/billing/billing'
-import { useBilling } from '../../shared/billing/store'
+import type { Session } from '../../shared/auth/session'
 import { bdt, bdtSigned, count, periodName } from '../../shared/format'
 import { Card, EmptyRow, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
-import { sampleFiInstitutionId } from '../../shared/usage/sample'
+import { FiGate, type FiBilling } from './fi-gate'
 
-/** Every monthly statement, newest first. Open one to check it against your usage. UI only. */
-export function StatementsPage() {
-  const billing = useBilling()
+/** Every finalized monthly statement, newest first. Open one to check it against your usage. */
+export function StatementsPage({ session }: { session: Session }) {
+  return <FiGate session={session}>{(data, institutionId) => <StatementsBody data={data} institutionId={institutionId} />}</FiGate>
+}
+
+function StatementsBody({ data, institutionId }: { data: FiBilling; institutionId: string }) {
+  const { billing } = data
   const navigate = useNavigate()
-  const statements = institutionStatements(billing, sampleFiInstitutionId)
+  const statements = institutionStatements(billing, institutionId)
 
   return (
     <>

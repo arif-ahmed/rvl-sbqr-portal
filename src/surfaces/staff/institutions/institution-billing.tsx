@@ -1,23 +1,26 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bdt, bdtRate, count, periodName } from '../../../shared/format'
-import { buildStatement, type Statement } from '../../../shared/billing/billing'
-import { useBilling } from '../../../shared/billing/store'
+import { buildStatement, type BillingData, type Statement } from '../../../shared/billing/billing'
 import { StatementDrawer } from '../../../shared/billing/statement-drawer'
 import { Banner, Card, CardHeader, EmptyRow, StatusChip, Table, Td, Th, Tr } from '../../../shared/ui'
+import { BillingGate } from '../billing/billing-gate'
 import { useRateCards } from '../rates/api/hooks'
 import { cardFor, currentMonth } from '../rates/rates'
 
-/** One institution's billing: the statements it has received and the price its usage is charged at. Statements are still sample data; the rate card in the right-hand panel is the API's truth. */
-export function InstitutionBillingTab({ institutionId, institutionName, hasRateCard }: { institutionId: string; institutionName: string; hasRateCard: boolean }) {
-  const billing = useBilling()
+type Props = { institutionId: string; institutionName: string; hasRateCard: boolean }
+
+/** One institution's billing: the statements it has received and the price its usage is charged at. */
+export function InstitutionBillingTab(props: Props) {
+  return <BillingGate>{(billing) => <InstitutionBillingBody billing={billing} {...props} />}</BillingGate>
+}
+
+function InstitutionBillingBody({ billing, institutionId, institutionName, hasRateCard }: Props & { billing: BillingData }) {
   const [selected, setSelected] = useState<Statement | null>(null)
   const statements = [...billing.periods]
     .reverse()
     .map((p) => buildStatement(billing, institutionId, p))
     .filter((s): s is Statement => s !== null)
-  // The in-effect card is the API's truth (was previously read from the legacy billing store,
-  // which only knew the seven seeded institutions).
   const { items: cards, isPending, error } = useRateCards(institutionId)
   const card = cardFor(cards, institutionId, currentMonth())
 

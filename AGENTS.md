@@ -25,7 +25,7 @@ Run lint, test and build before saying work is done.
 - UI role checks are convenience only. The API scopes are the security boundary; do not rely on hiding buttons.
 - Use design tokens and the components described in DESIGN.md. No raw hex, no new UI library.
 - All requests are same-origin (`/v1/...`). Do not add CORS workarounds or absolute API URLs.
-- Auth is mock-only behind `VITE_MOCK_AUTH` until the API has user login. Never enable it in production, and never add real credentials to `mock.ts`.
+- Sign-in is client credentials only (`platform_bootstrap` for staff, the provisioned client for an institution); there are no per-user accounts. No mock or sample data in `src`: every screen reads the API, and tests stub the API with `src/test/fake-backend.ts`.
 - Keep the access token in memory only. Never write tokens, client secrets or keys to localStorage, logs, or the repo. Provisioned secrets are shown once.
 - Do not commit `.env`; update `.env.example` instead.
 - Payments and Dues are out of MVP.

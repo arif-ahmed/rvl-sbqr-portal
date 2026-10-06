@@ -2,14 +2,16 @@ import { useSyncExternalStore } from 'react'
 import { authenticate, resetApiClient, type TokenClaims } from '../api/client'
 import { queryClient } from '../api/query'
 
-export type Role = 'admin' | 'finance' | 'fi'
+export type Role = 'admin' | 'fi'
 export type Surface = 'staff' | 'fi'
 
 export type Session = {
   userId: string
   name: string
-  /** Shown under the name: "Finance", "Platform Admin", or the institution name. */
+  /** Shown under the name: "Platform Admin" or "Institution Portal". */
   title: string
+  /** The institution's tenant id (an FI session only). The API scopes every FI request to it from the token. */
+  tenantId?: string
   role: Role
   surface: Surface
 }
@@ -45,25 +47,17 @@ function sessionFromClaims(c: TokenClaims): Session {
     return { userId: c.sub || 'staff', name: 'RVL Staff', title: 'Platform Admin', role: 'admin', surface: 'staff' }
   }
   if (c.tenantId) {
-    return { userId: c.sub, name: c.sub, title: 'Institution Portal', role: 'fi', surface: 'fi' }
+    return { userId: c.sub, name: c.sub, title: 'Institution Portal', role: 'fi', surface: 'fi', tenantId: c.tenantId }
   }
   throw new Error('This client credential cannot access either portal.')
 }
 
 /**
- * Sign-in has no per-user accounts yet (AGENTS.md): the "username" and
- * "password" are a client_id / client_secret pair exchanged at
- * POST /v1/oauth/token. With VITE_MOCK_AUTH=true (prototype builds only)
- * the demo accounts in ./mock take precedence. Replace both paths with the
- * user-login endpoint once the API grows one.
+ * Sign-in has no per-user accounts (AGENTS.md): the "username" and "password" are a
+ * client_id / client_secret pair exchanged at POST /v1/oauth/token. RVL staff sign in with the
+ * platform bootstrap client; an institution signs in with the client it was provisioned.
  */
 export async function signIn(clientId: string, clientSecret: string, surface: Surface): Promise<Session> {
-  if (import.meta.env.VITE_MOCK_AUTH === 'true') {
-    const { mockSignIn } = await import('./mock')
-    const next = await mockSignIn(clientId, clientSecret, surface)
-    setSession(next)
-    return next
-  }
   const claims = await authenticate(clientId, clientSecret)
   let next: Session
   try {

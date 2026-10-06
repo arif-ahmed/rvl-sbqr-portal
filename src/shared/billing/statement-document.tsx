@@ -68,7 +68,7 @@ export function StatementDocument({
             <div className="mt-1 font-semibold">
               1 – {lastDay} {periodName(statement.period)}
             </div>
-            <div className="text-text-2">Rate card from {periodName(statement.rate.effectiveFrom.slice(0, 7))}</div>
+            {statement.rate.effectiveFrom && <div className="text-text-2">Rate card from {periodName(statement.rate.effectiveFrom.slice(0, 7))}</div>}
           </div>
           <div className="text-right">
             <div className={label}>Status</div>
@@ -84,7 +84,7 @@ export function StatementDocument({
         </div>
         <p className="mt-3 text-text-2">
           {finalized
-            ? `Approved on ${meta.finalizedAt} by ${meta.finalizedBy}. This statement is locked.`
+            ? `Approved on ${meta.finalizedAt}${meta.finalizedBy ? ` by ${meta.finalizedBy}` : ''}. This statement is locked.`
             : `Not yet approved${meta.calculatedAt ? `, calculated ${meta.calculatedAt}` : ''}. Figures may change until the month is finalized.`}
         </p>
 

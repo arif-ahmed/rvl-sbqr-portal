@@ -24,11 +24,11 @@ export default function FiSurface({ session }: { session: Session }) {
           path={p.to.replace('/fi/', '')}
           element={shell(
             p.label,
-            p.to === '/fi/usage' ? <UsagePage /> : p.to === '/fi/statements' ? <StatementsPage /> : <OverviewPage session={session} />,
+            p.to === '/fi/usage' ? <UsagePage session={session} /> : p.to === '/fi/statements' ? <StatementsPage session={session} /> : <OverviewPage session={session} />,
           )}
         />
       ))}
-      <Route path="statements/:period" element={shell('Statements', <StatementDetailPage />)} />
+      <Route path="statements/:period" element={shell('Statements', <StatementDetailPage session={session} />)} />
       <Route path="*" element={<Navigate to="/fi/overview" replace />} />
     </Routes>
   )

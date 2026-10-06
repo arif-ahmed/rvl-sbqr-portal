@@ -2,7 +2,6 @@ import { ArrowLeft, Check, Circle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ApiError, errorMessage } from '../../../shared/api/client'
-import type { Role } from '../../../shared/auth/session'
 import { cn } from '../../../shared/cn'
 import { Banner, Card, CardHeader, StatusChip } from '../../../shared/ui'
 import { typeLabel } from '../onboarding/institution-types'
@@ -29,7 +28,7 @@ function Facts({ rows }: { rows: [string, ReactNode][] }) {
 const Empty = ({ children }: { children: ReactNode }) => <p className="p-5 text-text-3">{children}</p>
 
 /** One institution: profile, setup progress, credentials, signing key and billing, from the API. */
-export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?: 'overview' | 'usage' | 'billing' }) {
+export function InstitutionDetail({ tab = 'overview' }: { tab?: 'overview' | 'usage' | 'billing' }) {
   const { id } = useParams()
   const institution = useInstitution(id)
   const onboardingQuery = useOnboarding(id)
@@ -50,7 +49,6 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
   const hasUsage = inst.status !== 'Pending'
   if ((tab === 'usage' || tab === 'billing') && !hasUsage) return <Navigate to={`/staff/institutions/${inst.id}`} replace />
 
-  const canManage = role === 'admin'
   const items = setupItems(onboarding)
   const done = items.filter((s) => s.done).length
   const credential = onboarding?.credential ?? null
@@ -74,7 +72,7 @@ export function InstitutionDetail({ role, tab = 'overview' }: { role: Role; tab?
           </p>
         </div>
         <span className="flex-1" />
-        {canManage && <ActionButtons inst={inst} onAction={run} />}
+        <ActionButtons inst={inst} onAction={run} />
       </div>
 
       {hasUsage && (

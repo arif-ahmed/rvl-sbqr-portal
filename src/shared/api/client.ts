@@ -137,6 +137,8 @@ export class ApiError extends Error {
   readonly status: number
   readonly title: string | null
   readonly detail: string | null
+  /** The problem body's `code` extension, e.g. USAGE_NOT_COMPLETE on a 409 (null when absent). */
+  readonly code: string | null
   readonly blockers: Blocker[]
 
   constructor(method: string, path: string, status: number, problem: unknown) {
@@ -146,6 +148,7 @@ export class ApiError extends Error {
     const body = problem && typeof problem === 'object' ? (problem as Record<string, unknown>) : {}
     this.title = typeof body.title === 'string' ? body.title : null
     this.detail = typeof body.detail === 'string' ? body.detail : null
+    this.code = typeof body.code === 'string' ? body.code : null
     this.blockers = Array.isArray(body.blockers)
       ? body.blockers.filter((b): b is Blocker => !!b && typeof (b as Blocker).code === 'string' && typeof (b as Blocker).message === 'string')
       : []
@@ -160,8 +163,8 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-/** Authed request. Re-mints once and retries on 401 (expired token). Bodies are JSON; 204 resolves to undefined. */
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+/** Authed request. Re-mints once and retries on 401 (expired token). Bodies are JSON. */
+async function send(method: Method, path: string, body?: unknown): Promise<Response> {
   const attempt = (token: string) =>
     fetch(path, {
       method,
@@ -174,12 +177,21 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
     res = await attempt(await mint())
   }
   if (!res.ok) throw new ApiError(method, path, res.status, await res.json().catch(() => null))
+  return res
+}
+
+/** JSON in, JSON out; 204 resolves to undefined. */
+async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, body)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
 /** Authed GET. */
 export const apiGet = <T>(path: string): Promise<T> => request<T>('GET', path)
+
+/** Authed GET of a text body (the CSV exports). */
+export const apiGetText = async (path: string): Promise<string> => (await send('GET', path)).text()
 
 /** Authed POST / PUT / PATCH / DELETE with an optional JSON body. */
 export const apiSend = <T = void>(method: Exclude<Method, 'GET'>, path: string, body?: unknown): Promise<T> => request<T>(method, path, body)

@@ -3,9 +3,9 @@ import type { LucideIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '../../shared/auth/session'
 import { cn } from '../../shared/cn'
-import { bdt, count, monthShort, periodName } from '../../shared/format'
-import { draftPeriod, openIssues, pendingAdjustments, periodTotals, queuedEvents } from '../../shared/billing/billing'
-import { useBilling } from '../../shared/billing/store'
+import { bdt, count, monthShort, percent, percentSigned, periodName } from '../../shared/format'
+import { draftPeriod, openIssues, pendingAdjustments, periodTotals, type BillingData } from '../../shared/billing/billing'
+import { BillingGate } from './billing/billing-gate'
 import { useInstitutions } from './institutions/api/hooks'
 
 import { BarChart, Button, Card, CardHeader, Kpi, Table, Td, Th, Tr } from '../../shared/ui'
@@ -25,10 +25,13 @@ const greeting = () => {
   return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-/** The staff home: the month-close story for Finance, the platform story for Admin. UI only. */
+/** The staff home: the month-close story while a month is being prepared, the platform story otherwise. */
 export function OverviewPage({ session }: { session: Session }) {
+  return <BillingGate>{(billing) => <OverviewBody billing={billing} session={session} />}</BillingGate>
+}
+
+function OverviewBody({ billing, session }: { billing: BillingData; session: Session }) {
   const navigate = useNavigate()
-  const billing = useBilling()
   const institutions = useInstitutions()
   const nameOf = (id: string) => billing.institutions.find((i) => i.id === id)?.name ?? id
 
@@ -37,7 +40,8 @@ export function OverviewPage({ session }: { session: Session }) {
   const previous = draftIndex > 0 ? billing.periods[draftIndex - 1] : null
   const totals = draft ? periodTotals(billing, draft) : null
   const prevTotals = previous ? periodTotals(billing, previous) : null
-  const queued = queuedEvents(billing).length
+  const queued = billing.outbox.length
+  const closing = !!draft && billing.periodMeta[draft].status === 'Draft'
   const pending = pendingAdjustments(billing).length
   const issues = openIssues(billing)
   const active = institutions.filter((i) => i.status === 'Active')
@@ -45,14 +49,11 @@ export function OverviewPage({ session }: { session: Session }) {
   const prevCalls = prevTotals
     ? prevTotals.counts.staticGenerations + prevTotals.counts.dynamicGenerations + prevTotals.counts.validations
     : 0
-  const mom =
-    previous && prevCalls
-      ? `${calls >= prevCalls ? '+' : ''}${(((calls || 1) / prevCalls - 1) * 100).toFixed(1)}% vs ${monthShort(previous)}`
-      : undefined
+  const mom = previous && prevCalls ? `${percentSigned((calls / prevCalls - 1) * 100)} vs ${monthShort(previous)}` : undefined
 
   const attention: AttentionItem[] = []
-  if (queued > 0) attention.push({ tone: 'warn', icon: AlertTriangle, title: `${queued} usage events queued`, sub: `${nameOf(queuedEvents(billing)[0].institutionId)} · blocks finalizing`, to: '/staff/periods' })
-  if (pending > 0 && draft) attention.push({ tone: 'info', icon: Info, title: `${pending} pending adjustments`, sub: `Applied when ${periodName(draft)} is finalized`, to: '/staff/adjustments' })
+  if (queued > 0) attention.push({ tone: 'warn', icon: AlertTriangle, title: `${queued} usage ${queued === 1 ? 'event' : 'events'} queued`, sub: `${billing.outbox.filter((e) => e.status === 'Dead').length} dead-lettered · blocks finalizing`, to: '/staff/periods' })
+  if (pending > 0 && draft) attention.push({ tone: 'info', icon: Info, title: `${pending} pending ${pending === 1 ? 'adjustment' : 'adjustments'}`, sub: `Applied when ${periodName(draft)} is finalized`, to: '/staff/adjustments' })
   // Certificate expiry is not in the tenant list (the column was retired); a live institution with no rate card is.
   for (const i of active.filter((a) => !a.hasRateCard))
     attention.push({ tone: 'warn', icon: Clock, title: 'No rate card, usage is not billed', sub: i.name, to: `/staff/institutions/${i.id}` })
@@ -66,18 +67,18 @@ export function OverviewPage({ session }: { session: Session }) {
       <section className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-line bg-surface px-6 py-5">
         <div className="min-w-0">
           <h2 className="font-head text-2xl font-bold tracking-tight">
-            {session.role === 'finance' && draft ? `${periodName(draft)} is ready to close` : `${greeting()}, ${session.name.split(' ')[0]}`}
+            {closing && draft ? `${periodName(draft)} is ready to close` : `${greeting()}, ${session.name.split(' ')[0]}`}
           </h2>
           <p className="max-w-2xl text-text-2">
-            {session.role === 'finance' && draft
+            {closing
               ? queued > 0
-                ? `${queued} usage events are still queued. Resolve them, then finalize the month.`
+                ? `${queued} usage ${queued === 1 ? 'event is' : 'events are'} still outstanding. Resolve them, then finalize the month.`
                 : 'All usage is delivered. Review the draft statements and finalize the month.'
               : `${active.length} institutions are live, ${institutions.filter((i) => i.status === 'Pending').length} awaiting activation. Onboard a new institution or review usage for those without a rate card.`}
           </p>
         </div>
         <span className="flex-1" />
-        {session.role === 'finance' && draft ? (
+        {closing ? (
           <Button variant="primary" onClick={() => navigate('/staff/periods')}>
             Open billing period <ChevronRight className="size-4" aria-hidden />
           </Button>
@@ -96,7 +97,7 @@ export function OverviewPage({ session }: { session: Session }) {
           value={count(calls)}
           sub={mom}
         />
-        <Kpi icon={<CreditCard aria-hidden />} label={draft ? `${periodName(draft)} total` : 'Period total'} value={totals ? bdt(totals.total) : bdt(0)} sub={draft && billing.periodMeta[draft].status === 'Draft' ? 'Draft · not yet finalized' : 'Finalized'} />
+        <Kpi icon={<CreditCard aria-hidden />} label={draft ? `${periodName(draft)} total` : 'Period total'} value={totals ? bdt(totals.total) : bdt(0)} sub={draft ? (billing.periodMeta[draft].status === 'Draft' ? 'Draft · not yet finalized' : 'Live view · not yet drafted') : 'Finalized'} />
         <Kpi icon={<Flag aria-hidden />} label="Open items" value={count(issues)} sub={issues ? 'Need attention before month close' : 'All clear'} />
       </div>
 
@@ -120,7 +121,7 @@ export function OverviewPage({ session }: { session: Session }) {
               label="Monthly billable calls, generations and validations"
               data={billing.periods.map((p) => {
                 const t = periodTotals(billing, p)
-                return { label: monthShort(p), a: t.counts.staticGenerations + t.counts.dynamicGenerations, b: t.counts.validations, draft: billing.periodMeta[p].status === 'Draft' }
+                return { label: monthShort(p), a: t.counts.staticGenerations + t.counts.dynamicGenerations, b: t.counts.validations, draft: billing.periodMeta[p].status !== 'Finalized' }
               })}
             />
           </div>
@@ -155,7 +156,7 @@ export function OverviewPage({ session }: { session: Session }) {
           <CardHeader
             title={`Institutions · ${periodName(draft)}`}
             actions={
-              <Button size="sm" onClick={() => navigate(session.role === 'finance' ? '/staff/periods' : '/staff/institutions')}>
+              <Button size="sm" onClick={() => navigate('/staff/periods')}>
                 View all
               </Button>
             }
@@ -185,7 +186,7 @@ export function OverviewPage({ session }: { session: Session }) {
                       <b>{bdt(s.total)}</b>
                     </Td>
                     <Td>
-                      <div className="h-2 w-full rounded-full bg-surface-2" role="img" aria-label={`${pct.toFixed(1)}% of the month`}>
+                      <div className="h-2 w-full rounded-full bg-surface-2" role="img" aria-label={`${percent(pct)} of the month`}>
                         <div className="h-2 rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, pct)).toFixed(1)}%` }} />
                       </div>
                     </Td>

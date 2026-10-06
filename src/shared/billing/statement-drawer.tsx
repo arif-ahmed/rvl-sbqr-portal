@@ -1,4 +1,5 @@
 import { Download, FileText } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { bdt, bdtRate, bdtSigned, count, periodName } from '../format'
 import { cn } from '../cn'
@@ -19,6 +20,7 @@ export function StatementDrawer({
   institutionName,
   meta,
   printHref,
+  extraActions,
   onClose,
 }: {
   statement: Statement
@@ -26,6 +28,8 @@ export function StatementDrawer({
   meta: BillingPeriodMeta
   /** Where the printable bill lives on this surface; omit when there is none. */
   printHref?: string
+  /** Further footer buttons this surface offers, e.g. the raw usage export. */
+  extraActions?: ReactNode
   onClose: () => void
 }) {
   const finalized = meta.status === 'Finalized'
@@ -43,6 +47,7 @@ export function StatementDrawer({
       footer={
         <>
           <Button onClick={onClose}>Close</Button>
+          {extraActions}
           {printHref && (
             <Link to={printHref} className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 font-semibold hover:bg-surface-2">
               <FileText className="size-4" aria-hidden /> Open bill (PDF)
@@ -62,11 +67,13 @@ export function StatementDrawer({
         )}
       >
         <b className="block text-text">
-          {finalized ? 'Finalized' : 'Draft'} · {periodName(statement.period)}
+          {meta.status} · {periodName(statement.period)}
         </b>
         {finalized
-          ? `Locked on ${meta.finalizedAt} by ${meta.finalizedBy}. Statements cannot change.`
-          : 'Figures may still change until the month is finalized.'}
+          ? `Locked on ${meta.finalizedAt}${meta.finalizedBy ? ` by ${meta.finalizedBy}` : ''}. Statements cannot change.`
+          : meta.status === 'Provisional'
+            ? 'A live view, not saved. Figures change until a draft is created and the month is finalized.'
+            : 'Figures may still change until the month is finalized.'}
       </div>
 
       <Table>
@@ -121,7 +128,7 @@ export function StatementDrawer({
       </Table>
 
       <p className="mt-4 text-[12.5px] text-text-3">
-        Rate card effective {periodName(statement.rate.effectiveFrom.slice(0, 7))}. This statement is a billing record, not a tax invoice.
+        {statement.rate.effectiveFrom ? `Rate card effective ${periodName(statement.rate.effectiveFrom.slice(0, 7))}. ` : ''}This statement is a billing record, not a tax invoice.
       </p>
     </Drawer>
   )

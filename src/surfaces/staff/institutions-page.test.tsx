@@ -13,13 +13,13 @@ beforeEach(async () => {
 })
 afterEach(() => backend.reset())
 
-async function setup(role: 'admin' | 'finance' = 'admin') {
+async function setup() {
   const user = userEvent.setup()
   renderApp(
     <Routes>
-      <Route path="/staff/institutions" element={<InstitutionsPage role={role} />} />
+      <Route path="/staff/institutions" element={<InstitutionsPage />} />
       <Route path="/staff/institutions/new" element={<p>onboarding</p>} />
-      <Route path="/staff/institutions/:id" element={<InstitutionDetail role={role} />} />
+      <Route path="/staff/institutions/:id" element={<InstitutionDetail />} />
     </Routes>,
     ['/staff/institutions'],
   )
@@ -89,13 +89,6 @@ describe('institutions list', () => {
     expect(await screen.findByText('onboarding')).toBeInTheDocument()
   })
 
-  it('gives Finance a read-only list', async () => {
-    await setup('finance')
-    expect(screen.queryByRole('button', { name: /actions/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Add institution' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
-  })
-
   it('opens the detail page from a row click, but not from an action', async () => {
     const user = await setup()
     await user.click(within(row('Shapla')).getByText('000901'))
@@ -115,7 +108,7 @@ describe('institutions list when the API fails', () => {
   it('says so and recovers on retry', async () => {
     const user = userEvent.setup()
     backend.failNext('GET', '/v1/admin/tenants', 500)
-    renderApp(<InstitutionsPage role="admin" />)
+    renderApp(<InstitutionsPage />)
     expect(await screen.findByText('Could not load institutions')).toBeInTheDocument()
     expect(screen.queryByText('No institutions match')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Try again' }))

@@ -3,6 +3,7 @@ import { authenticate, resetApiClient } from '../shared/api/client'
 import type { OnboardingDto, OnboardingStepDto, StepCode, StepStatus, TenantDto } from '../surfaces/staff/institutions/api/types'
 import { stepOrder } from '../surfaces/staff/institutions/api/types'
 import type { CreateRateCardDto, RateCardDto } from '../surfaces/staff/rates/api/types'
+import { FakeBilling } from './fake-billing'
 
 // An in-memory stand-in for the platform admin API (rvl-secure-bqr-manager). It now serves
 // both the tenant onboarding endpoints (docs/features/institution-onboarding/implementation-guide.md
@@ -26,12 +27,15 @@ type Rec = {
 
 export type Call = { method: string; path: string; body: unknown }
 
-const adminJwt = `h.${btoa(JSON.stringify({ sub: 'platform-admin', scope: ['admin'] }))}.s`
+const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims))}.s`
+const adminJwt = jwt({ sub: 'platform-admin', scope: ['admin'] })
+/** The moment every test runs at: early October 2026, Dhaka. September is the month that just ended. */
+export const TEST_NOW = new Date('2026-10-06T04:00:00Z')
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString()
 const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (y: number, m: number) => `${y}-${pad(m)}-01`
 const monthOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
-const nextMonth = (d = new Date()) => {
+const nextMonth = (d = TEST_NOW) => {
   const n = new Date(d.getFullYear(), d.getMonth() + 1, 1)
   return monthOf(n)
 }
@@ -72,7 +76,7 @@ const rateCard = (tenantId: string, effectiveFrom: string, generationRate: numbe
 
 /** The institutions the list and detail tests expect (same ids and names as the old mock data). */
 function seed(): Rec[] {
-  const now = new Date()
+  const now = TEST_NOW
   const year = now.getFullYear()
   return [
     { ...blank(), tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-1', ymd(year, 1), 0.5, 0.125), rateCard('inst-1', `${nextMonth()}-01`, 0.45, 0.12)] },
@@ -91,6 +95,15 @@ export class FakeBackend {
   records: Rec[] = seed()
   calls: Call[] = []
   private counter = 0
+  /** The billing and usage endpoints. Seed it directly: `backend.billing.addUsageCounts(...)`. */
+  billing = new FakeBilling(
+    (tenantId) => this.find(tenantId)?.rateCards ?? [],
+    () => this.records.map((r) => r.tenant.tenantId),
+    () => new Date(),
+  )
+  private token = adminJwt
+  /** Credentials the token endpoint accepts once any are registered; with none, every sign-in succeeds. */
+  private clients = new Map<string, { secret: string; token: string }>()
   /** Make the next `method path` request (path without query) fail with this status, once. */
   private failures = new Map<string, number>()
 
@@ -193,6 +206,9 @@ export class FakeBackend {
       return problem(failure, 'Request failed', `Injected ${failure}.`)
     }
     const b = (body ?? {}) as { [k: string]: unknown }
+
+    const billed = this.billing.handle(method, pathname, new URL(url, 'http://fake').searchParams, b)
+    if (billed) return billed
 
     if (pathname === '/v1/admin/institutions') return new Response(null, { status: 404 }) // the picker falls back to its built-in list
     if (pathname === '/v1/admin/tenants' && method === 'GET') {
@@ -312,22 +328,48 @@ export class FakeBackend {
     return problem(404, 'Not found', `${method} ${pathname} is not part of the fake API.`)
   }
 
-  /** Route `fetch` to this backend and sign in, as the app does after login. Call `reset()` in afterEach. */
-  async install() {
+  /** Register a client the token endpoint will accept, e.g. `addClient('platform_bootstrap', 'pw', { sub: 'platform-admin', scope: ['admin'] })`. */
+  addClient(clientId: string, secret: string, claims: object) {
+    this.clients.set(clientId, { secret, token: jwt(claims) })
+  }
+
+  /**
+   * Route `fetch` to this backend and sign in, as the app does after login. Call `reset()` in afterEach.
+   * `as` an institution mints that tenant's token (scope billing:read, a tenant_id claim) instead of the admin's.
+   * The clock is pinned to TEST_NOW so months and "today" are the same in every run.
+   */
+  async install(as?: { tenantId?: string; clientId?: string; signedIn?: boolean }) {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(TEST_NOW)
+    this.billing.fiTenantId = as?.tenantId ?? null
+    this.token = as?.tenantId ? jwt({ sub: as.clientId ?? 'fi-client', tenant_id: as.tenantId, scope: ['billing:read', 'qr:generate', 'qr:validate'] }) : adminJwt
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL, init?: RequestInit) => {
-        if (String(url).endsWith('/v1/oauth/token')) return Response.json({ accessToken: adminJwt, tokenType: 'Bearer', expiresIn: 600 })
+        if (String(url).endsWith('/v1/oauth/token')) {
+          if (this.clients.size === 0) return Response.json({ accessToken: this.token, tokenType: 'Bearer', expiresIn: 600 })
+          const form = init?.body instanceof URLSearchParams ? init.body : new URLSearchParams()
+          const client = this.clients.get(form.get('client_id') ?? '')
+          if (!client || client.secret !== form.get('client_secret')) return new Response(null, { status: 401 })
+          return Response.json({ accessToken: client.token, tokenType: 'Bearer', expiresIn: 600 })
+        }
         const body = typeof init?.body === 'string' && init.body ? (JSON.parse(init.body) as unknown) : undefined
         return this.handle(init?.method ?? 'GET', String(url), body)
       }),
     )
-    await authenticate('platform-bootstrap', 'secret')
+    if (as?.signedIn !== false) await authenticate(as?.clientId ?? 'platform-bootstrap', 'secret')
     return this
   }
 
   reset() {
     vi.unstubAllGlobals()
+    vi.useRealTimers()
+    this.billing.usage = []
+    this.billing.adjustments = []
+    this.billing.outbox = []
+    this.billing.periods.clear()
+    this.billing.fiTenantId = null
+    this.clients.clear()
     resetApiClient()
     this.records = seed()
     this.calls = []
@@ -336,4 +378,4 @@ export class FakeBackend {
 }
 
 /** A backend with the standard seven institutions, signed in. */
-export const installFakeBackend = () => new FakeBackend().install()
+export const installFakeBackend = (as?: { tenantId?: string; clientId?: string; signedIn?: boolean }) => new FakeBackend().install(as)

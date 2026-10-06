@@ -16,14 +16,12 @@ function stubToken(token: string) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  vi.unstubAllEnvs()
   resetApiClient()
   signOut()
 })
 
 describe('real sign-in (client credentials)', () => {
   it('routes an admin-scoped token to the staff console', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'false')
     stubToken(adminToken)
 
     const session = await signIn('platform-bootstrap', 'secret', 'staff')
@@ -33,16 +31,14 @@ describe('real sign-in (client credentials)', () => {
   })
 
   it('routes a tenant token to the institution portal', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'false')
     stubToken(tenantToken)
 
     const session = await signIn('shapla-api', 'secret', 'fi')
 
-    expect(session).toMatchObject({ role: 'fi', surface: 'fi', userId: 'client:shapla-api' })
+    expect(session).toMatchObject({ role: 'fi', surface: 'fi', userId: 'client:shapla-api', tenantId: '0f1e2d3c-1111-2222-3333-444455556666' })
   })
 
   it('rejects a credential minted for the other portal and drops it', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'false')
     stubToken(adminToken)
 
     await expect(signIn('platform-bootstrap', 'secret', 'fi')).rejects.toThrow('RVL staff console')
@@ -50,7 +46,6 @@ describe('real sign-in (client credentials)', () => {
   })
 
   it('rejects a token with no portal identity', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'false')
     stubToken(jwt({ sub: 'nobody', scope: [] }))
 
     await expect(signIn('odd-client', 'secret', 'fi')).rejects.toThrow('cannot access either portal')
@@ -59,7 +54,6 @@ describe('real sign-in (client credentials)', () => {
 
 describe('sign-out', () => {
   it('clears the session and the held credentials', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'false')
     stubToken(adminToken)
     const session = await signIn('platform-bootstrap', 'secret', 'staff')
     expect(session.surface).toBe('staff')
@@ -68,14 +62,5 @@ describe('sign-out', () => {
 
     expect(getSession()).toBeNull()
     await expect(import('../api/client').then((m) => m.apiGet('/v1/x'))).rejects.toThrow('Not signed in.')
-  })
-})
-
-describe('mock sign-in', () => {
-  // The vitest env sets VITE_MOCK_AUTH=true (vite.config.ts); demo accounts
-  // must keep working while the flag is on.
-  it('still accepts the demo accounts', async () => {
-    const session = await signIn('admin@rvl.example', 'Demo@1234', 'staff')
-    expect(session).toMatchObject({ role: 'admin', surface: 'staff' })
   })
 })

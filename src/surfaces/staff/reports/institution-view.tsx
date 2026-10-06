@@ -2,9 +2,9 @@ import { Download, FileText, Printer } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bdt, bdtRate, bdtSigned, count, monthShort, percent, percentSigned, periodName } from '../../../shared/format'
-import { draftPeriod, type Period } from '../../../shared/billing/billing'
+import { draftPeriod, type Period, type BillingData } from '../../../shared/billing/billing'
 import { PeriodPicker } from '../../../shared/billing/period-picker'
-import { useBilling } from '../../../shared/billing/store'
+import { BillingGate } from '../billing/billing-gate'
 import { downloadText } from '../../../shared/download'
 import { Banner, Button, Card, CardHeader, Kpi, Select, StatusChip, Table, Td, Th, Tr } from '../../../shared/ui'
 import { institutionReport, institutionReportToCsv } from './report'
@@ -14,9 +14,12 @@ import { institutionReport, institutionReportToCsv } from './report'
  * Results by outcome and daily usage arrive with the usage ledger. UI only.
  */
 export function InstitutionView() {
-  const billing = useBilling()
+  return <BillingGate>{(billing) => <InstitutionViewBody billing={billing} />}</BillingGate>
+}
+
+function InstitutionViewBody({ billing }: { billing: BillingData }) {
   const [period, setPeriod] = useState<Period>(() => draftPeriod(billing) ?? billing.periods[billing.periods.length - 1])
-  const [institutionId, setInstitutionId] = useState(billing.institutions[0].id)
+  const [institutionId, setInstitutionId] = useState(billing.institutions[0]?.id ?? '')
   const report = institutionReport(billing, institutionId, period)
   const name = billing.institutions.find((i) => i.id === institutionId)?.name ?? institutionId
   const s = report.statement
@@ -49,7 +52,7 @@ export function InstitutionView() {
       </div>
       <p className="mb-5 max-w-3xl text-text-2">
         {periodName(period)}
-        {s ? `, rate card from ${periodName(s.rate.effectiveFrom.slice(0, 7))}.` : '.'}
+        {s?.rate.effectiveFrom ? `, rate card from ${periodName(s.rate.effectiveFrom.slice(0, 7))}.` : '.'}
       </p>
 
       {report.unbilledVolume > 0 && (

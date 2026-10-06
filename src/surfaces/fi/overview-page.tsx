@@ -2,30 +2,33 @@ import { ChevronRight, CreditCard, Gavel, QrCode, ScanLine } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '../../shared/auth/session'
 import { buildStatement, disputeWindowEnd, draftPeriod, institutionStatements, stampNow } from '../../shared/billing/billing'
-import { useBilling } from '../../shared/billing/store'
 import { bdt, count, monthShort, percentSigned, periodName } from '../../shared/format'
 import { BarChart, Button, Card, CardHeader, Kpi, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
-import { sampleEvents, sampleFiInstitutionId } from '../../shared/usage/sample'
+import { useUsageEvents } from '../../shared/usage/api/hooks'
+import { lastDayOf } from '../../shared/usage/api/mappers'
 import { formatEventTime, meterLabel, verdictLabel } from '../../shared/usage/usage'
-
-const institutionId = sampleFiInstitutionId
-const recent = sampleEvents.filter((e) => e.institutionId === institutionId).slice(0, 6)
+import { FiGate, type FiBilling } from './fi-gate'
 
 const greeting = () => {
   const hour = new Date().getHours()
   return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-/** The institution's home: this month so far, the months side by side, the bills and the latest activity. UI only. */
+/** The institution's home: this month so far, the months side by side, the bills and the latest activity. */
 export function OverviewPage({ session }: { session: Session }) {
+  return <FiGate session={session}>{(data, institutionId) => <OverviewBody data={data} institutionId={institutionId} session={session} />}</FiGate>
+}
+
+function OverviewBody({ data, institutionId, session }: { data: FiBilling; institutionId: string; session: Session }) {
   const navigate = useNavigate()
-  const billing = useBilling()
+  const { billing, usage } = data
   const period = draftPeriod(billing) ?? billing.periods[billing.periods.length - 1]
   const idx = billing.periods.indexOf(period)
   const previous = idx > 0 ? billing.periods[idx - 1] : null
-  const counts = billing.counts[institutionId]?.[period]
+  const counts = usage[period]?.[institutionId]
+  const recent = useUsageEvents({ kind: 'fi' }, { from: `${period}-01`, to: lastDayOf(period) }).events.slice(0, 6)
   const calls = (counts?.staticGenerations ?? 0) + (counts?.dynamicGenerations ?? 0) + (counts?.validations ?? 0)
-  const prev = previous ? billing.counts[institutionId]?.[previous] : undefined
+  const prev = previous ? usage[previous]?.[institutionId] : undefined
   const prevCalls = (prev?.staticGenerations ?? 0) + (prev?.dynamicGenerations ?? 0) + (prev?.validations ?? 0)
   const change = prevCalls ? `${percentSigned(((calls - prevCalls) / prevCalls) * 100)} vs ${monthShort(previous!)}` : undefined
 
@@ -95,7 +98,7 @@ export function OverviewPage({ session }: { session: Session }) {
             <BarChart
               label="Billed calls by month, generations and validations"
               data={billing.periods.map((p) => {
-                const c = billing.counts[institutionId]?.[p]
+                const c = usage[p]?.[institutionId]
                 return {
                   label: monthShort(p),
                   a: (c?.staticGenerations ?? 0) + (c?.dynamicGenerations ?? 0),
