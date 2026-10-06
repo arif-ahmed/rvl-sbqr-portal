@@ -29,6 +29,10 @@ const steps: (StepDef & { id: StepCode })[] = stepOrder.map((id) => ({ id, label
 /** Where a resumed wizard starts, read once so later refetches never move the user around. */
 type Start = { existing: Institution; step: StepCode; capabilities: { generation: boolean; validation: boolean } }
 
+/** Coerce a wire step code into a known StepCode; falls back to the supplied default. */
+const fromWireStep = (step: string | null | undefined, fallback: StepCode): StepCode =>
+  stepOrder.includes(step as StepCode) ? (step as StepCode) : fallback
+
 export default function OnboardingPage() {
   const [params] = useSearchParams()
   const resumeId = params.get('resume')
@@ -40,11 +44,15 @@ function Resume({ id }: { id: string }) {
   const onboarding = useOnboarding(id)
   const [start, setStart] = useState<Start | null>(null)
   // Captured once: activating the institution later must not bounce this screen back to the list.
+  // The starting step comes from the server's `OnboardingView.currentStep` —
+  // the reconciler's view of `tenant_configuration` (the `tenants` row's
+  // entitlements + status) and the live cross-module facts. Local component
+  // state never invents a starting step on its own.
   if (!start && institution.data && onboarding.data) {
     const config = onboarding.data.configuration
     setStart({
       existing: institution.data,
-      step: onboarding.data.currentStep ?? 'REVIEW',
+      step: fromWireStep(onboarding.data.currentStep, 'REVIEW'),
       capabilities: { generation: config?.isQrGenerationAllowed ?? true, validation: config?.isQrValidationAllowed ?? true },
     })
   }
@@ -76,6 +84,12 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
   const [error, setError] = useState<string | null>(null)
   const [refusal, setRefusal] = useState<Blocker[]>([])
 
+  // The wizard always reads `OnboardingView` from the API — the source-of-truth
+  // for `tenant_configuration` (the tenant row's `is_qr_generation_allowed` /
+  // `is_qr_validation_allowed`) and the live cross-module facts (active
+  // credential, active signing key, trust entry, rate card). The hook layer
+  // invalidates `['onboarding', tenantId]` after every successful mutation,
+  // so this query re-fetches automatically as the user advances.
   const onboarding = useOnboarding(tenantId).data
   const registerTenant = useRegisterTenant()
   const saveConfiguration = useSaveConfiguration()
@@ -102,6 +116,11 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
       onSuccess: (tenant) => {
         setTenantId(tenant.tenantId)
         setProfile(p)
+        // Nudge locally so the user sees immediate progress even on a slow
+        // network. The hooks layer invalidates ['onboarding', tenantId]
+        // after this mutation; the refetched view (which now reflects the
+        // freshly-stamped PROFILE step + tenant.registered audit row) lands
+        // via the normal TanStack Query cycle.
         go(1)
       },
       onError: fail,

@@ -288,4 +288,16 @@ describe('institution onboarding: resuming', () => {
     setup('/staff/institutions/new?resume=inst-4')
     expect(await screen.findByText('Could not load this institution')).toBeInTheDocument()
   })
+
+  it('hydrates the starting step from the server\'s OnboardingView.currentStep, not local state', async () => {
+    // inst-4 (Surma Payments) starts at Signing key per the seed.
+    // If the wizard ever fell back to its local "start at PROFILE" default,
+    // it would render the institution form first. The source-of-truth is
+    // OnboardingView.currentStep; the wizard must respect it.
+    setup('/staff/institutions/new?resume=inst-4')
+    expect(await heading('Continue setup: Surma Payments Ltd')).toBeInTheDocument()
+    expect(await heading('Signing key')).toBeInTheDocument()
+    // The wizard fetched the onboarding view and read currentStep from it.
+    expect(backend.callsTo('GET', '/onboarding').length).toBeGreaterThanOrEqual(1)
+  })
 })
