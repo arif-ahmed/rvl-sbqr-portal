@@ -6,7 +6,7 @@ import { renderApp } from '../../test/providers'
 import { seedOctober2026 } from '../../test/scenario'
 import { OverviewPage } from './overview-page'
 
-const admin: Session = { userId: 'platform-admin', name: 'RVL Staff', title: 'Platform Admin', role: 'admin', surface: 'staff' }
+const admin: Session = { userId: 'id-platform-admin', username: 'platform-admin', name: 'RVL Staff', title: 'Platform Admin', role: 'MASTER_ADMIN', surface: 'staff', mustChangePassword: false }
 
 let backend: FakeBackend
 beforeEach(async () => {

@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import { authenticate, resetApiClient } from '../shared/api/client'
+import { loginRequest, resetApiClient } from '../shared/api/client'
 import type { OnboardingDto, OnboardingStepDto, StepCode, StepStatus, TenantDto } from '../surfaces/staff/institutions/api/types'
 import { stepOrder } from '../surfaces/staff/institutions/api/types'
 import type { CreateRateCardDto, RateCardDto } from '../surfaces/staff/rates/api/types'
@@ -27,8 +27,9 @@ type Rec = {
 
 export type Call = { method: string; path: string; body: unknown }
 
-const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims))}.s`
-const adminJwt = jwt({ sub: 'platform-admin', scope: ['admin'] })
+export type FakeUser = { password: string; role: string; displayName: string; mustChangePassword: boolean }
+type RefreshToken = { username: string; family: number; revoked: boolean }
+
 /** The moment every test runs at: early October 2026, Dhaka. September is the month that just ended. */
 export const TEST_NOW = new Date('2026-10-06T04:00:00Z')
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString()
@@ -101,9 +102,18 @@ export class FakeBackend {
     () => this.records.map((r) => r.tenant.tenantId),
     () => new Date(),
   )
-  private token = adminJwt
-  /** Credentials the token endpoint accepts once any are registered; with none, every sign-in succeeds. */
-  private clients = new Map<string, { secret: string; token: string }>()
+  /** Accounts the login endpoint knows. `master` / `secret` is always there. */
+  readonly users = new Map<string, FakeUser>()
+  /** Access token lifetime the API reports and enforces, in seconds. The real API issues 900. */
+  accessLifetimeSeconds = 900
+  /** Login, refresh, logout and change-password requests, kept apart from `calls` (the data API). */
+  authCalls: Call[] = []
+  private accessTokens = new Map<string, { username: string; expiresAt: number }>()
+  private refreshTokens = new Map<string, RefreshToken>()
+  /** The browser's HttpOnly refresh cookie. JavaScript cannot see it, so neither can the app under test. */
+  private cookie: string | null = null
+  private tokenCounter = 0
+  private familyCounter = 0
   /** Make the next `method path` request (path without query) fail with this status, once. */
   private failures = new Map<string, number>()
 
@@ -328,9 +338,117 @@ export class FakeBackend {
     return problem(404, 'Not found', `${method} ${pathname} is not part of the fake API.`)
   }
 
-  /** Register a client the token endpoint will accept, e.g. `addClient('platform_bootstrap', 'pw', { sub: 'platform-admin', scope: ['admin'] })`. */
-  addClient(clientId: string, secret: string, claims: object) {
-    this.clients.set(clientId, { secret, token: jwt(claims) })
+  /** Register an account the login endpoint will accept. */
+  addUser(username: string, password: string, extra: Partial<Omit<FakeUser, 'password'>> = {}) {
+    this.users.set(username, { password, role: 'MASTER_ADMIN', displayName: username, mustChangePassword: false, ...extra })
+  }
+
+  /** Make every issued access token fail with 401 (as if they all expired), leaving the refresh cookie alone. */
+  expireAccessTokens() {
+    this.accessTokens.clear()
+  }
+
+  /** Drop the refresh cookie, as when it expires or another device signs this account out. */
+  dropRefreshCookie() {
+    this.cookie = null
+  }
+
+  /** The refresh cookie's current value, for tests that replay a stale one. */
+  get refreshCookie() {
+    return this.cookie
+  }
+
+  /** Put a (stale) value back in the cookie jar. */
+  setRefreshCookie(value: string | null) {
+    this.cookie = value
+  }
+
+  private issueAccess(username: string) {
+    const token = `access-${++this.tokenCounter}`
+    this.accessTokens.set(token, { username, expiresAt: Date.now() + this.accessLifetimeSeconds * 1000 })
+    return token
+  }
+
+  private issueRefresh(username: string, family: number) {
+    const token = `refresh-${++this.tokenCounter}`
+    this.refreshTokens.set(token, { username, family, revoked: false })
+    this.cookie = token
+    return token
+  }
+
+  private revokeFamily(family: number) {
+    for (const t of this.refreshTokens.values()) if (t.family === family) t.revoked = true
+  }
+
+  private userPayload(username: string) {
+    const u = this.users.get(username)!
+    return { id: `id-${username}`, username, displayName: u.displayName, role: u.role, mustChangePassword: u.mustChangePassword }
+  }
+
+  private validBearer(token: string | undefined) {
+    const t = token ? this.accessTokens.get(token) : undefined
+    return !!t && Date.now() < t.expiresAt
+  }
+
+  /** The /v1/auth/* surface, mirroring AuthController: cookie-borne refresh token, rotation with reuse detection. */
+  private auth(method: string, url: string, body: unknown, bearer: string | undefined): Response {
+    const { pathname } = new URL(url, 'http://fake')
+    this.authCalls.push({ method, path: pathname, body })
+    const failure = this.failures.get(`${method} ${pathname}`)
+    if (failure) {
+      this.failures.delete(`${method} ${pathname}`)
+      return new Response(null, { status: failure })
+    }
+    const b = (body ?? {}) as { [k: string]: unknown }
+    const tokens = (username: string) => ({
+      accessToken: this.issueAccess(username),
+      tokenType: 'Bearer',
+      expiresIn: this.accessLifetimeSeconds,
+      refreshTokenExpiresAt: inDays(7),
+      user: this.userPayload(username),
+    })
+
+    if (pathname === '/v1/auth/login' && method === 'POST') {
+      const username = String(b.username ?? '').toLowerCase()
+      const user = this.users.get(username)
+      if (!user || user.password !== b.password) return Response.json({ error: 'invalid_credentials' }, { status: 401 })
+      this.issueRefresh(username, ++this.familyCounter)
+      return Response.json(tokens(username))
+    }
+    if (pathname === '/v1/auth/refresh' && method === 'POST') {
+      const current = this.cookie ? this.refreshTokens.get(this.cookie) : undefined
+      const rejected = () => {
+        this.cookie = null
+        return Response.json({ error: 'invalid_refresh_token' }, { status: 401 })
+      }
+      if (!current) return rejected()
+      if (current.revoked) {
+        this.revokeFamily(current.family)
+        return rejected()
+      }
+      current.revoked = true
+      this.issueRefresh(current.username, current.family)
+      return Response.json(tokens(current.username))
+    }
+    if (!this.validBearer(bearer)) return new Response(null, { status: 401 })
+    const username = this.accessTokens.get(bearer!)!.username
+    if (pathname === '/v1/auth/logout' && method === 'POST') {
+      const current = this.cookie ? this.refreshTokens.get(this.cookie) : undefined
+      if (current) this.revokeFamily(current.family)
+      this.cookie = null
+      return new Response(null, { status: 204 })
+    }
+    if (pathname === '/v1/auth/change-password' && method === 'POST') {
+      const user = this.users.get(username)!
+      if (user.password !== b.currentPassword) return Response.json({ error: 'invalid_credentials' }, { status: 401 })
+      if (!b.newPassword || b.newPassword === b.currentPassword) return Response.json({ error: 'New password must differ from the current password.' }, { status: 400 })
+      user.password = String(b.newPassword)
+      user.mustChangePassword = false
+      for (const t of this.refreshTokens.values()) t.revoked = true
+      this.cookie = null
+      return new Response(null, { status: 204 })
+    }
+    return new Response(null, { status: 404 })
   }
 
   /**
@@ -338,26 +456,23 @@ export class FakeBackend {
    * `as` an institution mints that tenant's token (scope billing:read, a tenant_id claim) instead of the admin's.
    * The clock is pinned to TEST_NOW so months and "today" are the same in every run.
    */
-  async install(as?: { tenantId?: string; clientId?: string; signedIn?: boolean }) {
+  async install(as?: { tenantId?: string; username?: string; signedIn?: boolean }) {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(TEST_NOW)
     this.billing.fiTenantId = as?.tenantId ?? null
-    this.token = as?.tenantId ? jwt({ sub: as.clientId ?? 'fi-client', tenant_id: as.tenantId, scope: ['billing:read', 'qr:generate', 'qr:validate'] }) : adminJwt
+    if (!this.users.has('master')) this.addUser('master', 'secret', { displayName: 'Master Admin' })
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL, init?: RequestInit) => {
-        if (String(url).endsWith('/v1/oauth/token')) {
-          if (this.clients.size === 0) return Response.json({ accessToken: this.token, tokenType: 'Bearer', expiresIn: 600 })
-          const form = init?.body instanceof URLSearchParams ? init.body : new URLSearchParams()
-          const client = this.clients.get(form.get('client_id') ?? '')
-          if (!client || client.secret !== form.get('client_secret')) return new Response(null, { status: 401 })
-          return Response.json({ accessToken: client.token, tokenType: 'Bearer', expiresIn: 600 })
-        }
+        const bearer = (init?.headers as Record<string, string> | undefined)?.Authorization?.replace('Bearer ', '')
         const body = typeof init?.body === 'string' && init.body ? (JSON.parse(init.body) as unknown) : undefined
-        return this.handle(init?.method ?? 'GET', String(url), body)
+        const method = init?.method ?? 'GET'
+        if (new URL(String(url), 'http://fake').pathname.startsWith('/v1/auth/')) return this.auth(method, String(url), body, bearer)
+        if (!this.validBearer(bearer)) return new Response(null, { status: 401 })
+        return this.handle(method, String(url), body)
       }),
     )
-    if (as?.signedIn !== false) await authenticate(as?.clientId ?? 'platform-bootstrap', 'secret')
+    if (as?.signedIn !== false) await loginRequest(as?.username ?? 'master', 'secret')
     return this
   }
 
@@ -369,7 +484,12 @@ export class FakeBackend {
     this.billing.outbox = []
     this.billing.periods.clear()
     this.billing.fiTenantId = null
-    this.clients.clear()
+    this.users.clear()
+    this.accessTokens.clear()
+    this.refreshTokens.clear()
+    this.cookie = null
+    this.authCalls = []
+    this.accessLifetimeSeconds = 900
     resetApiClient()
     this.records = seed()
     this.calls = []
@@ -378,4 +498,4 @@ export class FakeBackend {
 }
 
 /** A backend with the standard seven institutions, signed in. */
-export const installFakeBackend = (as?: { tenantId?: string; clientId?: string; signedIn?: boolean }) => new FakeBackend().install(as)
+export const installFakeBackend = (as?: { tenantId?: string; username?: string; signedIn?: boolean }) => new FakeBackend().install(as)

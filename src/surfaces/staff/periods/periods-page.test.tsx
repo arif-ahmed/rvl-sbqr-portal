@@ -7,7 +7,7 @@ import { renderApp } from '../../../test/providers'
 import { seedOctober2026, SEPTEMBER } from '../../../test/scenario'
 import { PeriodsPage } from './periods-page'
 
-const session: Session = { userId: 'platform-admin', name: 'RVL Staff', title: 'Platform Admin', role: 'admin', surface: 'staff' }
+const session: Session = { userId: 'id-platform-admin', username: 'platform-admin', name: 'RVL Staff', title: 'Platform Admin', role: 'MASTER_ADMIN', surface: 'staff', mustChangePassword: false }
 const renderPage = () => renderApp(<PeriodsPage session={session} />)
 
 let backend: FakeBackend

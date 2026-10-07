@@ -18,7 +18,7 @@ npm ci
 npm run dev            # http://localhost:5175
 ```
 
-Sign-in exchanges API client credentials at `POST /v1/oauth/token` (OAuth 2.1 client-credentials): the login form's Client ID / Client secret are the `client_id` / `client_secret`, and the minted bearer token — held in memory only — authenticates later `/v1` calls and is re-minted 30s before it expires. RVL staff sign in with the platform bootstrap client (`platform_bootstrap`); an institution signs in with the client provisioned for it. There are no per-user accounts and no mock data: every screen reads the API.
+Users sign in with a username and password at `POST /v1/auth/login`. The API returns a 15-minute access token (held in memory only; it authenticates later `/v1` calls) and sets a 7-day rotating refresh token as an HttpOnly cookie (`sbqr_rt`, `Path=/v1/auth`) that JavaScript never sees. The portal refreshes the access token a minute before it expires (and on tab focus or reconnect), retries once on a 401, and after a page reload restores the session by calling `POST /v1/auth/refresh`; only a non-secret `sbqr-session` flag is kept in `localStorage` so a reload knows whether to try. Refresh calls are serialized (single in-flight promise plus a Web Lock across tabs) because the API revokes a session if one refresh token is used twice. An account flagged `mustChangePassword` is sent to `/change-password` first. Accounts are created by the platform (`--seed-admin`); there is no self-service sign-up and no mock data: every screen reads the API. How to run and test it by hand: `docs/features/portal-user-login/dev-testing-guide.md` in the workspace repo.
 
 | Command | What it does |
 |---|---|
@@ -39,8 +39,8 @@ src/
   index.css           design tokens (see DESIGN.md)
   surfaces/staff/     RVL Admin and Finance screens
   surfaces/fi/        Institution screens
-  pages/login.tsx     sign-in for both audiences
-  shared/auth         in-memory session, sign-in (client credentials)
+  pages/login.tsx     username/password sign-in; pages/change-password.tsx
+  shared/auth         session store, sign-in, reload restore (refresh cookie)
   shared/layout       AppShell (sidebar, top bar), ComingSoon placeholder
   shared/ui           design-system components
   shared/             format helpers, cn, theme
@@ -63,8 +63,10 @@ Vite, React 19, TypeScript, Tailwind v4, Radix, TanStack Query, react-hook-form 
 
 ## Backend dependencies (not built yet)
 
-- Per-user login (sign-in today is a shared client-credentials exchange, one credential per tenant/staff console).
-- Separate Finance role/scope (today a single `admin` scope).
+- Institution (tenant) user login: only platform users can sign in today, so the `fi` surface is built but unreachable until the API signs tenant users in and puts the tenant on the token.
+- Users CRUD (list, create, disable, reset password); accounts come from the `--seed-admin` CLI.
+- Human tokens on `/v1/crypto-keys` (it accepts only `admin` / `key-admin` scopes, so a signed-in user gets 403 on the onboarding signing-key step).
+- Per-role scopes beyond `MASTER_ADMIN` on `/v1/admin/*` (only the master admin passes today).
 - FI-scoped read endpoints for own usage and statements.
 - `FinalizedBy` taken from the token, not the request body.
 

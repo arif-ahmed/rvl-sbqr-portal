@@ -2,55 +2,47 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff, QrCode } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
-import { homePath, signIn, useSession, type Surface } from '../shared/auth/session'
-import { cn } from '../shared/cn'
+import { clearSessionNotice, landingPath, signIn, useSession, useSessionNotice } from '../shared/auth/session'
 import { Banner, Button, Field, Input } from '../shared/ui'
 
-// The API has no per-user accounts yet, so sign-in is a client-credentials
-// exchange (POST /v1/oauth/token): the "username" is the client_id and the
-// "password" the client_secret issued at provisioning (AGENTS.md).
+// Users sign in with the username and password of their account (POST /v1/auth/login).
+// Accounts are created by the platform; there is no self-service registration.
 const schema = z.object({
-  clientId: z.string().trim().min(1, 'Enter your client ID.'),
-  clientSecret: z.string().min(1, 'Enter your client secret.'),
+  username: z.string().trim().min(1, 'Enter your username.'),
+  password: z.string().min(1, 'Enter your password.'),
 })
 type Values = z.infer<typeof schema>
 
-const copy: Record<Surface, { headline: string; text: string; hint: string }> = {
-  fi: {
-    headline: 'Your QR usage, statements and credentials in one place.',
-    text: 'Review every generation and validation, download monthly statements, and rotate your client secret when it expires.',
-    hint: 'your-client-id',
-  },
-  staff: {
-    headline: 'Run QR operations and billing with confidence.',
-    text: 'Onboard institutions, manage keys, set rate cards and close each billing month with a full audit trail.',
-    hint: 'platform-bootstrap',
-  },
+/** Only follow in-app paths back after sign-in (never an absolute or protocol-relative URL). */
+function safeReturnPath(from: unknown): string | null {
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && !from.startsWith('/login') ? from : null
 }
 
 export default function LoginPage() {
   const session = useSession()
+  const notice = useSessionNotice()
   const navigate = useNavigate()
-  const [surface, setSurface] = useState<Surface>('fi')
+  const location = useLocation()
+  const returnTo = safeReturnPath((location.state as { from?: unknown } | null)?.from)
   const [error, setError] = useState('')
   const [showPw, setShowPw] = useState(false)
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { clientId: '', clientSecret: '' } })
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { username: '', password: '' } })
   const { errors, isSubmitting } = form.formState
 
-  // The login screen takes its look from the chosen audience, like the signed-in app does.
   useEffect(() => {
-    document.documentElement.dataset.surface = surface
-  }, [surface])
+    document.documentElement.dataset.surface = 'staff'
+  }, [])
 
-  if (session) return <Navigate to={homePath(session)} replace />
+  if (session) return <Navigate to={session.mustChangePassword ? landingPath(session) : (returnTo ?? landingPath(session))} replace />
 
   async function onSubmit(v: Values) {
     setError('')
     try {
-      const next = await signIn(v.clientId, v.clientSecret, surface)
-      navigate(homePath(next), { replace: true })
+      const next = await signIn(v.username, v.password)
+      clearSessionNotice()
+      navigate(next.mustChangePassword ? landingPath(next) : (returnTo ?? landingPath(next)), { replace: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not sign in.')
     }
@@ -66,8 +58,10 @@ export default function LoginPage() {
           <b className="font-head text-sm">Secure Bangla QR</b>
         </div>
         <div>
-          <h2 className="mb-3.5 max-w-[16ch] font-head text-[32px] leading-[40px] font-bold tracking-tight">{copy[surface].headline}</h2>
-          <p className="max-w-[44ch] text-[15px] leading-[23px] text-side-text">{copy[surface].text}</p>
+          <h2 className="mb-3.5 max-w-[16ch] font-head text-[32px] leading-[40px] font-bold tracking-tight">Run QR operations and billing with confidence.</h2>
+          <p className="max-w-[44ch] text-[15px] leading-[23px] text-side-text">
+            Onboard institutions, manage keys, set rate cards and close each billing month with a full audit trail.
+          </p>
         </div>
         <small className="text-side-head">© 2026 Relief Validation Limited · Bangladesh Bank BQR</small>
       </section>
@@ -75,38 +69,22 @@ export default function LoginPage() {
       <section className="grid place-items-center p-8">
         <div className="w-full max-w-[420px]">
           <h1 className="mb-1.5 font-head text-[26px] leading-8 font-bold tracking-tight">Sign in</h1>
-          <p className="mb-6 text-text-2">{surface === 'fi' ? 'Institution portal for Secure Bangla QR.' : 'RVL staff console for operations and billing.'}</p>
+          <p className="mb-6 text-text-2">RVL staff console for operations and billing.</p>
 
-          <div role="tablist" aria-label="Sign in as" className="mb-6 grid grid-cols-2 rounded-[11px] bg-line p-1">
-            {(['fi', 'staff'] as const).map((s) => (
-              <button
-                key={s}
-                role="tab"
-                aria-selected={surface === s}
-                onClick={() => {
-                  setSurface(s)
-                  setError('')
-                }}
-                className={cn('h-9 rounded-lg font-semibold text-text-2', surface === s && 'bg-surface text-text shadow-sm')}
-              >
-                {s === 'fi' ? 'Institution' : 'RVL Staff'}
-              </button>
-            ))}
-          </div>
-
+          {notice && !error && <Banner tone="info" title={notice} />}
           {error && <Banner tone="bad" title={error} />}
 
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-            <Field label="Client ID" htmlFor="clientId" error={errors.clientId?.message}>
-              <Input id="clientId" autoComplete="off" placeholder={copy[surface].hint} aria-invalid={!!errors.clientId} {...form.register('clientId')} />
+            <Field label="Username" htmlFor="username" error={errors.username?.message}>
+              <Input id="username" autoComplete="username" autoCapitalize="none" spellCheck={false} aria-invalid={!!errors.username} {...form.register('username')} />
             </Field>
-            <Field label="Client secret" htmlFor="clientSecret" error={errors.clientSecret?.message} hint="Issued when the account was provisioned and shown only once.">
+            <Field label="Password" htmlFor="password" error={errors.password?.message}>
               <div className="relative">
-                <Input id="clientSecret" type={showPw ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-invalid={!!errors.clientSecret} {...form.register('clientSecret')} />
+                <Input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" spellCheck={false} aria-invalid={!!errors.password} {...form.register('password')} />
                 <button
                   type="button"
                   className="absolute top-1 right-1.5 grid size-8 place-items-center text-text-3"
-                  aria-label={showPw ? 'Hide client secret' : 'Show client secret'}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPw((s) => !s)}
                 >
                   {showPw ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
@@ -117,7 +95,6 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
-
         </div>
       </section>
     </div>

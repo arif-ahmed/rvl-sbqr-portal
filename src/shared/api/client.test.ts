@@ -1,147 +1,342 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, apiGet, apiSend, authenticate, errorMessage, resetApiClient } from './client'
+import {
+  ApiError,
+  apiGet,
+  apiSend,
+  changePasswordRequest,
+  errorMessage,
+  loginRequest,
+  logoutRequest,
+  refreshSession,
+  resetApiClient,
+  SessionExpiredError,
+  setSessionExpiredHandler,
+} from './client'
 
-/** Minimal unsigned JWT — only the payload segment is decoded. */
-const jwt = (payload: object) => `h.${btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.s`
+const user = { id: 'u1', username: 'master', displayName: 'Master Admin', role: 'MASTER_ADMIN', mustChangePassword: false }
+const authBody = (n: number, expiresIn = 900) => ({
+  accessToken: `access-${n}`,
+  tokenType: 'Bearer',
+  expiresIn,
+  refreshTokenExpiresAt: '2026-10-14T00:00:00Z',
+  user,
+})
 
-const adminToken = jwt({ sub: 'platform-admin', scope: ['admin'] })
+type Call = { url: string; init?: RequestInit }
 
-function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
-  return vi.fn(async (url: string | URL, init?: RequestInit) => handler(String(url), init))
+/**
+ * Stub the API: `auth` answers /v1/auth/* (default: every login and refresh succeeds with the next
+ * access-N token), `data` answers everything else. Returns the calls, in order.
+ */
+function stubApi(opts: { auth?: (url: string, n: number) => Response | undefined; data?: (url: string, init: RequestInit | undefined, n: number) => Response } = {}) {
+  const calls: Call[] = []
+  let tokens = 0
+  let dataCalls = 0
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url)
+      calls.push({ url: u, init })
+      if (u.startsWith('/v1/auth/')) {
+        if (opts.auth) return opts.auth(u, tokens + 1) ?? Response.json(authBody(++tokens))
+        return Response.json(authBody(++tokens))
+      }
+      return opts.data ? opts.data(u, init, ++dataCalls) : Response.json({ fine: true })
+    }),
+  )
+  return calls
 }
+
+const authHeader = (c: Call) => (c.init?.headers as Record<string, string> | undefined)?.Authorization
+const authCalls = (calls: Call[], path: string) => calls.filter((c) => c.url === path)
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
+  setSessionExpiredHandler(null)
   resetApiClient()
 })
 
-describe('authenticate', () => {
-  it('exchanges client credentials at /v1/oauth/token and returns decoded claims', async () => {
-    const fetchMock = stubFetch((url) =>
-      url.endsWith('/v1/oauth/token')
-        ? Response.json({ accessToken: adminToken, tokenType: 'Bearer', expiresIn: 600 })
-        : new Response(null, { status: 404 }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+describe('loginRequest', () => {
+  it('posts the credentials as JSON, returns the user and uses the access token from then on', async () => {
+    const calls = stubApi()
 
-    const claims = await authenticate('platform-bootstrap', 'secret')
+    await expect(loginRequest('  master ', 'pw')).resolves.toEqual(user)
 
-    expect(claims).toEqual({ sub: 'platform-admin', tenantId: null, scopes: ['admin'] })
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(String(url)).toBe('/v1/oauth/token')
-    expect(init?.method).toBe('POST')
-    expect(new URLSearchParams(String(init?.body))).toEqual(
-      new URLSearchParams({ grant_type: 'client_credentials', client_id: 'platform-bootstrap', client_secret: 'secret' }),
-    )
+    expect(calls[0].url).toBe('/v1/auth/login')
+    expect(calls[0].init?.method).toBe('POST')
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ username: 'master', password: 'pw' })
+    await apiGet('/v1/things')
+    expect(authHeader(calls[1])).toBe('Bearer access-1')
   })
 
-  it('collapses every 401 into one invalid-credentials message', async () => {
-    vi.stubGlobal('fetch', stubFetch(() => Response.json({ error: 'invalid_client' }, { status: 401 })))
-    await expect(authenticate('x', 'y')).rejects.toThrow('Invalid client ID or client secret.')
+  it('falls back to the username when the API sends no display name', async () => {
+    stubApi({ auth: () => Response.json({ ...authBody(1), user: { ...user, displayName: '' } }) })
+    await expect(loginRequest('master', 'pw')).resolves.toMatchObject({ displayName: 'master' })
   })
 
-  it('surfaces the token endpoint rate limit', async () => {
-    vi.stubGlobal('fetch', stubFetch(() => new Response(null, { status: 429 })))
-    await expect(authenticate('x', 'y')).rejects.toThrow('Too many sign-in attempts.')
+  it('reports a wrong password in one message', async () => {
+    stubApi({ auth: () => Response.json({ error: 'invalid_credentials' }, { status: 401 }) })
+    await expect(loginRequest('master', 'nope')).rejects.toThrow('Invalid username or password.')
   })
 
-  it('wraps network failures', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('fetch failed'))))
-    await expect(authenticate('x', 'y')).rejects.toThrow('Could not reach the sign-in service.')
-  })
-})
-
-describe('token refresh', () => {
-  it('re-mints from the held credentials 30s before expiry', async () => {
-    vi.useFakeTimers()
-    const fetchMock = stubFetch(() => Response.json({ accessToken: adminToken, tokenType: 'Bearer', expiresIn: 600 }))
-    vi.stubGlobal('fetch', fetchMock)
-    await authenticate('platform-bootstrap', 'secret')
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(570_000 - 1)
-    expect(fetchMock).toHaveBeenCalledTimes(1) // not yet
-    await vi.advanceTimersByTimeAsync(1)
-    expect(fetchMock).toHaveBeenCalledTimes(2) // proactive re-mint fired
-    const body = new URLSearchParams(String(fetchMock.mock.calls[1][1]?.body))
-    expect(body.get('client_secret')).toBe('secret')
+  it('reports rate limiting', async () => {
+    stubApi({ auth: () => new Response(null, { status: 429 }) })
+    await expect(loginRequest('master', 'pw')).rejects.toThrow('Too many sign-in attempts.')
   })
 
-  it('shares one token request across concurrent calls', async () => {
-    const fetchMock = stubFetch((url) =>
-      url.endsWith('/v1/oauth/token')
-        ? Response.json({ accessToken: adminToken, tokenType: 'Bearer', expiresIn: 600 })
-        : Response.json([{ ok: 1 }]),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    await authenticate('platform-bootstrap', 'secret')
-
-    await Promise.all([apiGet('/v1/a'), apiGet('/v1/b')])
-    expect(fetchMock).toHaveBeenCalledTimes(3) // one mint + two GETs, no second mint
+  it('reports an unreachable API', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+    await expect(loginRequest('master', 'pw')).rejects.toThrow('Could not reach the sign-in service.')
   })
 
-  it('stops refreshing after reset', async () => {
-    vi.useFakeTimers()
-    const fetchMock = stubFetch(() => Response.json({ accessToken: adminToken, tokenType: 'Bearer', expiresIn: 600 }))
-    vi.stubGlobal('fetch', fetchMock)
-    await authenticate('platform-bootstrap', 'secret')
-    resetApiClient()
-
-    await vi.advanceTimersByTimeAsync(600_000)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+  it('rejects an unexpected response body', async () => {
+    stubApi({ auth: () => Response.json({ hello: 'world' }) })
+    await expect(loginRequest('master', 'pw')).rejects.toThrow('unexpected response')
   })
 })
 
-describe('apiGet', () => {
-  it('sends the bearer token and re-mints once on 401', async () => {
-    const tokens = [jwt({ sub: 'a', scope: ['admin'] }), jwt({ sub: 'b', scope: ['admin'] })]
-    let tokenCalls = 0
-    const seenAuth: (string | null)[] = []
-    const fetchMock = stubFetch((url, init) => {
-      if (url.endsWith('/v1/oauth/token')) {
-        tokenCalls++
-        return Response.json({ accessToken: tokens[tokenCalls - 1], tokenType: 'Bearer', expiresIn: 600 })
-      }
-      seenAuth.push(init?.headers ? (init.headers as Record<string, string>).Authorization : null)
-      return seenAuth.length === 1 ? new Response(null, { status: 401 }) : Response.json({ fine: true })
-    })
-    vi.stubGlobal('fetch', fetchMock)
-    await authenticate('platform-bootstrap', 'secret')
+describe('refreshSession', () => {
+  it('posts an empty body (the refresh token is in the cookie) and returns the user', async () => {
+    const calls = stubApi()
+
+    await expect(refreshSession()).resolves.toEqual(user)
+
+    expect(calls[0].url).toBe('/v1/auth/refresh')
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({})
+  })
+
+  it('shares one request between parallel callers', async () => {
+    const calls = stubApi()
+    await Promise.all([refreshSession(), refreshSession(), refreshSession()])
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+  })
+
+  it('rejects with SessionExpiredError when the API refuses the cookie', async () => {
+    stubApi({ auth: () => Response.json({ error: 'invalid_refresh_token' }, { status: 401 }) })
+    await expect(refreshSession()).rejects.toBeInstanceOf(SessionExpiredError)
+  })
+
+  it('does not call a server error a sign-out', async () => {
+    stubApi({ auth: () => new Response(null, { status: 503 }) })
+    const error = await refreshSession().catch((e) => e)
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(SessionExpiredError)
+  })
+})
+
+describe('re-authenticating before the token expires', () => {
+  it('refreshes one minute before expiry and uses the new token', async () => {
+    vi.useFakeTimers()
+    const calls = stubApi()
+    await loginRequest('master', 'pw')
+
+    await vi.advanceTimersByTimeAsync(839_000)
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+    await apiGet('/v1/things')
+    expect(authHeader(calls[calls.length - 1])).toBe('Bearer access-2')
+  })
+
+  it('keeps refreshing: each new token schedules the next refresh', async () => {
+    vi.useFakeTimers()
+    const calls = stubApi()
+    await loginRequest('master', 'pw')
+
+    await vi.advanceTimersByTimeAsync(3 * 840_000)
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(3)
+  })
+
+  it('never schedules tighter than half the lifetime for a very short token', async () => {
+    vi.useFakeTimers()
+    const calls = stubApi({ auth: (_u, n) => Response.json(authBody(n, 30)) })
+    await loginRequest('master', 'pw')
+
+    await vi.advanceTimersByTimeAsync(14_000)
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(0)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+  })
+
+  it('retries a background refresh that failed for a transient reason, and keeps the session', async () => {
+    vi.useFakeTimers()
+    const expired = vi.fn()
+    setSessionExpiredHandler(expired)
+    let refreshes = 0
+    const calls = stubApi({ auth: (u) => (u === '/v1/auth/refresh' && ++refreshes === 1 ? new Response(null, { status: 503 }) : undefined) })
+    await loginRequest('master', 'pw')
+
+    await vi.advanceTimersByTimeAsync(840_000)
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(2)
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('ends the session when the background refresh is refused', async () => {
+    vi.useFakeTimers()
+    const expired = vi.fn()
+    setSessionExpiredHandler(expired)
+    stubApi({ auth: (u) => (u === '/v1/auth/refresh' ? Response.json({ error: 'invalid_refresh_token' }, { status: 401 }) : undefined) })
+    await loginRequest('master', 'pw')
+
+    await vi.advanceTimersByTimeAsync(840_000)
+
+    expect(expired).toHaveBeenCalledTimes(1)
+  })
+
+  it('tops the token up as soon as the tab is visible again, if the timer was throttled past the window', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const calls = stubApi()
+    await loginRequest('master', 'pw')
+    vi.setSystemTime(Date.now() + 850_000)
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1))
+  })
+
+  it('does not refresh on focus while the token is still comfortably valid', async () => {
+    const calls = stubApi()
+    await loginRequest('master', 'pw')
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('online'))
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(0)
+  })
+
+  it('refreshes before sending when the token is already inside the window', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const calls = stubApi()
+    await loginRequest('master', 'pw')
+    vi.setSystemTime(Date.now() + 850_000)
+
+    await apiGet('/v1/things')
+
+    expect(calls.map((c) => c.url)).toEqual(['/v1/auth/login', '/v1/auth/refresh', '/v1/things'])
+    expect(authHeader(calls[2])).toBe('Bearer access-2')
+  })
+})
+
+describe('a 401 from the API', () => {
+  it('refreshes once and retries with the new token', async () => {
+    const calls = stubApi({ data: (_u, _i, n) => (n === 1 ? new Response(null, { status: 401 }) : Response.json({ fine: true })) })
+    await loginRequest('master', 'pw')
 
     await expect(apiGet('/v1/things')).resolves.toEqual({ fine: true })
-    expect(tokenCalls).toBe(2)
-    expect(seenAuth[0]).not.toBe(seenAuth[1])
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+    expect(authHeader(calls[calls.length - 1])).toBe('Bearer access-2')
   })
 
-  it('refuses calls before sign-in', async () => {
-    await expect(apiGet('/v1/things')).rejects.toThrow('Not signed in.')
+  it('lets parallel requests that all got a 401 share one refresh', async () => {
+    const calls = stubApi({ data: (_u, init) => (authHeader({ url: '', init }) === 'Bearer access-1' ? new Response(null, { status: 401 }) : Response.json({ fine: true })) })
+    await loginRequest('master', 'pw')
+
+    await Promise.all([apiGet('/v1/a'), apiGet('/v1/b'), apiGet('/v1/c')])
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+  })
+
+  it('ends the session once when the refresh token is refused too', async () => {
+    const expired = vi.fn()
+    setSessionExpiredHandler(expired)
+    const calls = stubApi({
+      auth: (u) => (u === '/v1/auth/refresh' ? Response.json({ error: 'invalid_refresh_token' }, { status: 401 }) : undefined),
+      data: () => new Response(null, { status: 401 }),
+    })
+    await loginRequest('master', 'pw')
+
+    await expect(apiGet('/v1/things')).rejects.toBeInstanceOf(SessionExpiredError)
+
+    expect(expired).toHaveBeenCalledTimes(1)
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(1)
+    await expect(apiGet('/v1/things')).rejects.toBeInstanceOf(SessionExpiredError)
+  })
+
+  it('does not treat a 403 as a reason to refresh', async () => {
+    const calls = stubApi({ data: () => new Response(null, { status: 403 }) })
+    await loginRequest('master', 'pw')
+
+    await expect(apiGet('/v1/things')).rejects.toMatchObject({ status: 403 })
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(0)
+  })
+})
+
+describe('changePasswordRequest', () => {
+  it('sends both passwords with the bearer token', async () => {
+    const calls = stubApi({ auth: (u) => (u === '/v1/auth/change-password' ? new Response(null, { status: 204 }) : undefined) })
+    await loginRequest('master', 'pw')
+
+    await changePasswordRequest('pw', 'new-password')
+
+    const call = calls[calls.length - 1]
+    expect(call.url).toBe('/v1/auth/change-password')
+    expect(authHeader(call)).toBe('Bearer access-1')
+    expect(JSON.parse(String(call.init?.body))).toEqual({ currentPassword: 'pw', newPassword: 'new-password' })
+  })
+
+  it('reports a wrong current password without trying to refresh', async () => {
+    const calls = stubApi({ auth: (u) => (u === '/v1/auth/change-password' ? Response.json({ error: 'invalid_credentials' }, { status: 401 }) : undefined) })
+    await loginRequest('master', 'pw')
+
+    await expect(changePasswordRequest('wrong', 'new-password')).rejects.toThrow('Current password is incorrect.')
+
+    expect(authCalls(calls, '/v1/auth/refresh')).toHaveLength(0)
+  })
+
+  it('shows the API’s reason for rejecting the new password', async () => {
+    stubApi({ auth: (u) => (u === '/v1/auth/change-password' ? Response.json({ error: 'New password must differ.' }, { status: 400 }) : undefined) })
+    await loginRequest('master', 'pw')
+    await expect(changePasswordRequest('pw', 'pw')).rejects.toThrow('New password must differ.')
+  })
+})
+
+describe('logoutRequest', () => {
+  it('asks the API to revoke the session with the bearer token', async () => {
+    const calls = stubApi({ auth: (u) => (u === '/v1/auth/logout' ? new Response(null, { status: 204 }) : undefined) })
+    await loginRequest('master', 'pw')
+
+    await logoutRequest()
+
+    const call = calls[calls.length - 1]
+    expect(call.url).toBe('/v1/auth/logout')
+    expect(authHeader(call)).toBe('Bearer access-1')
+  })
+
+  it('never throws, even when the API is unreachable', async () => {
+    stubApi()
+    await loginRequest('master', 'pw')
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('offline'))))
+    await expect(logoutRequest()).resolves.toBeUndefined()
   })
 })
 
 describe('apiSend', () => {
-  async function signedIn(handler: (url: string, init?: RequestInit) => Response) {
-    const fetchMock = stubFetch((url, init) =>
-      url.endsWith('/v1/oauth/token') ? Response.json({ accessToken: adminToken, tokenType: 'Bearer', expiresIn: 600 }) : handler(url, init),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    await authenticate('platform-bootstrap', 'secret')
-    return fetchMock
+  async function signedIn(data: (url: string, init?: RequestInit) => Response) {
+    const calls = stubApi({ data })
+    await loginRequest('master', 'pw')
+    return calls
   }
 
   it('sends a JSON body with the bearer token and parses the response', async () => {
-    const fetchMock = await signedIn(() => Response.json({ tenantId: 't1' }, { status: 201 }))
+    const calls = await signedIn(() => Response.json({ tenantId: 't1' }, { status: 201 }))
     await expect(apiSend('POST', '/v1/admin/tenants', { institutionName: 'X' })).resolves.toEqual({ tenantId: 't1' })
-    const [, init] = fetchMock.mock.calls[1]
+    const { init } = calls[1]
     expect(init?.method).toBe('POST')
     expect(init?.body).toBe(JSON.stringify({ institutionName: 'X' }))
-    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' })
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json', Authorization: 'Bearer access-1' })
   })
 
   it('resolves to undefined on 204 and sends no body when none is given', async () => {
-    const fetchMock = await signedIn(() => new Response(null, { status: 204 }))
+    const calls = await signedIn(() => new Response(null, { status: 204 }))
     await expect(apiSend('DELETE', '/v1/admin/tenants/t1/signing-key')).resolves.toBeUndefined()
-    const [, init] = fetchMock.mock.calls[1]
+    const { init } = calls[1]
     expect(init?.body).toBeUndefined()
     expect(init?.headers).not.toHaveProperty('Content-Type')
   })
@@ -167,7 +362,7 @@ describe('apiSend', () => {
     expect(errorMessage(error, 'fallback')).toBe('fallback')
   })
 
-  it('re-mints once and retries a write on 401', async () => {
+  it('refreshes once and retries a write on 401', async () => {
     let calls = 0
     await signedIn(() => (++calls === 1 ? new Response(null, { status: 401 }) : Response.json({ ok: true })))
     await expect(apiSend('PATCH', '/v1/admin/tenants/t1/configuration', { isQrGenerationAllowed: true })).resolves.toEqual({ ok: true })

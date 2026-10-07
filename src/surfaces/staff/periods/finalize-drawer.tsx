@@ -23,7 +23,7 @@ export function FinalizeDrawer({ period, totals, session, onClose }: { period: P
 
   const confirm = () =>
     finalize.mutate(
-      { period, expectedTotal: totals.total, finalizedBy: session.userId },
+      { period, expectedTotal: totals.total, finalizedBy: session.username },
       {
         onSuccess: (outcome) => {
           if (outcome === 'Finalized') {
@@ -98,7 +98,7 @@ export function FinalizeDrawer({ period, totals, session, onClose }: { period: P
       </Field>
 
       <Field label="Finalized by" htmlFor="finalize-by" hint="Taken from your signed-in credential.">
-        <Input id="finalize-by" value={session.userId} readOnly />
+        <Input id="finalize-by" value={session.username} readOnly />
       </Field>
 
       <p className="flex items-center gap-2 text-[12.5px] text-text-3">

@@ -25,8 +25,9 @@ Run lint, test and build before saying work is done.
 - UI role checks are convenience only. The API scopes are the security boundary; do not rely on hiding buttons.
 - Use design tokens and the components described in DESIGN.md. No raw hex, no new UI library.
 - All requests are same-origin (`/v1/...`). Do not add CORS workarounds or absolute API URLs.
-- Sign-in is client credentials only (`platform_bootstrap` for staff, the provisioned client for an institution); there are no per-user accounts. No mock or sample data in `src`: every screen reads the API, and tests stub the API with `src/test/fake-backend.ts`.
-- Keep the access token in memory only. Never write tokens, client secrets or keys to localStorage, logs, or the repo. Provisioned secrets are shown once.
+- Sign-in is username and password (`POST /v1/auth/login`); client credentials are not used by the portal. No mock or sample data in `src`: every screen reads the API, and tests stub the API with `src/test/fake-backend.ts`.
+- Keep the access token in memory only. The refresh token lives only in the API's HttpOnly cookie; the portal never reads or stores it. The one thing written to localStorage is the non-secret `sbqr-session` flag (plus the theme). Never write tokens, passwords or keys to storage, logs, or the repo. Provisioned secrets are shown once.
+- Refresh calls go through `refreshSession()` in `src/shared/api/client.ts` and nowhere else: the API revokes the whole session when a refresh token is replayed, so refreshes must stay serialized.
 - Do not commit `.env`; update `.env.example` instead.
 - Payments and Dues are out of MVP.
 - Money: use the formatter in `src/shared`, never ad-hoc `toFixed`. Billing periods are `YYYY-MM` strings.

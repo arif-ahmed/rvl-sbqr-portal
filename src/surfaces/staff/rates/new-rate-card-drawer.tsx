@@ -15,7 +15,7 @@ const empty: RateCardForm = { institutionId: '', startMonth: '', generationRate:
 export function NewRateCardDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const institutions = useInstitutions().filter((i) => i.status !== 'Terminated')
   const add = useAddRateCard()
-  const actorLabel = useSession()?.userId ?? 'platform:admin'
+  const actorLabel = useSession()?.username ?? 'platform:admin'
   const form = useForm<RateCardForm>({ resolver: zodResolver(rateCardSchema), defaultValues: empty })
   const { errors } = form.formState
   const startMonth = useWatch({ control: form.control, name: 'startMonth' })

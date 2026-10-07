@@ -9,7 +9,7 @@ import { OverviewPage } from './overview-page'
 
 let backend: FakeBackend
 beforeEach(async () => {
-  backend = await new FakeBackend().install({ tenantId: SHAPLA, clientId: 'shapla-ops' })
+  backend = await new FakeBackend().install({ tenantId: SHAPLA })
   seedOctober2026(backend)
   // October is the open month; Shapla has used 200 billed calls so far.
   backend.billing.addUsageCounts(SHAPLA, '2026-10', { staticGenerations: 40, dynamicGenerations: 60, validations: 100 })

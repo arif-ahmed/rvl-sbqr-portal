@@ -28,7 +28,7 @@ export function NewAdjustmentDrawer({ open, onClose, session, billing }: { open:
 
   const save = form.handleSubmit((v) =>
     add.mutate(
-      { institutionId: v.institutionId, amount: Number(v.amount), reason: v.reason, createdBy: session.userId },
+      { institutionId: v.institutionId, amount: Number(v.amount), reason: v.reason, createdBy: session.username },
       {
         onSuccess: () => {
           toast.success('Adjustment recorded')

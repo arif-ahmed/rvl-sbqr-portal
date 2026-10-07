@@ -7,7 +7,7 @@ import { renderApp } from '../../../test/providers'
 import { AUGUST_CHARGE, seedOctober2026 } from '../../../test/scenario'
 import { AdjustmentsPage } from './adjustments-page'
 
-const session: Session = { userId: 'platform-admin', name: 'RVL Staff', title: 'Platform Admin', role: 'admin', surface: 'staff' }
+const session: Session = { userId: 'id-platform-admin', username: 'platform-admin', name: 'RVL Staff', title: 'Platform Admin', role: 'MASTER_ADMIN', surface: 'staff', mustChangePassword: false }
 const renderPage = () => renderApp(<AdjustmentsPage session={session} />)
 
 let backend: FakeBackend

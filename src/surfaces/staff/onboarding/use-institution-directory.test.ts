@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { authenticate, resetApiClient } from '../../../shared/api/client'
+import { loginRequest, resetApiClient } from '../../../shared/api/client'
 import {
   mergeDirectory,
   toRegistryEntry,
@@ -32,8 +32,13 @@ afterEach(() => {
   resetApiClient()
 })
 
-// authenticate() decodes the token payload, so the stub returns a minimal JWT.
-const adminJwt = `h.${btoa(JSON.stringify({ sub: 'platform-admin', scope: ['admin'] }))}.s`
+// loginRequest() parses the login response, so the stub answers with a minimal one.
+const loginPayload = {
+  accessToken: 'access-token',
+  tokenType: 'Bearer',
+  expiresIn: 900,
+  user: { id: 'u1', username: 'master', displayName: 'Master Admin', role: 'MASTER_ADMIN', mustChangePassword: false },
+}
 
 describe('toRegistryEntry', () => {
   it('splits the 6-digit code into type + 4-digit id', () => {
@@ -63,12 +68,11 @@ describe('useInstitutionDirectory', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (String(url).endsWith('/v1/oauth/token'))
-          return Response.json({ accessToken: adminJwt, tokenType: 'Bearer', expiresIn: 600 })
+        if (String(url).endsWith('/v1/auth/login')) return Response.json(loginPayload)
         return Response.json(live)
       }),
     )
-    await authenticate('platform-bootstrap', 'secret')
+    await loginRequest('master', 'secret')
     const { result } = renderHook(() => useInstitutionDirectory())
     await waitFor(() => expect(result.current.live).toBe(true))
     // Live rows overlay the full Annex A registry instead of replacing it.
@@ -82,12 +86,11 @@ describe('useInstitutionDirectory', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (String(url).endsWith('/v1/oauth/token'))
-          return Response.json({ accessToken: adminJwt, tokenType: 'Bearer', expiresIn: 600 })
+        if (String(url).endsWith('/v1/auth/login')) return Response.json(loginPayload)
         return new Response(null, { status: 500 })
       }),
     )
-    await authenticate('platform-bootstrap', 'secret')
+    await loginRequest('master', 'secret')
     const { result } = renderHook(() => useInstitutionDirectory())
     await waitFor(() => expect(result.current.live).toBe(false))
     // Static Annex A registry: 93 entries, nothing frozen.
