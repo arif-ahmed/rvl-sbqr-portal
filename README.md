@@ -65,7 +65,6 @@ Vite, React 19, TypeScript, Tailwind v4, Radix, TanStack Query, react-hook-form 
 
 - Institution (tenant) user login: only platform users can sign in today, so the `fi` surface is built but unreachable until the API signs tenant users in and puts the tenant on the token.
 - Users CRUD (list, create, disable, reset password); accounts come from the `--seed-admin` CLI.
-- Human tokens on `/v1/crypto-keys` (it accepts only `admin` / `key-admin` scopes, so a signed-in user gets 403 on the onboarding signing-key step).
 - Per-role scopes beyond `MASTER_ADMIN` on `/v1/admin/*` (only the master admin passes today).
 - FI-scoped read endpoints for own usage and statements.
 - `FinalizedBy` taken from the token, not the request body.
