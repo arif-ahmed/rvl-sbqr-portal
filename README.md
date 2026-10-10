@@ -25,7 +25,16 @@ Users sign in with a username and password at `POST /v1/auth/login`. The API ret
 | `npm run dev` | Vite dev server; proxies `/v1` and `/openapi` to `SBQR_API_URL` (default `http://localhost:5001`) |
 | `npm run lint` | oxlint |
 | `npm test` | Vitest (jsdom) |
-| `npm run build` | Typecheck + production build into `dist/` |
+| `npm run build` | Typecheck + production build into `dist/`. On Vercel it also writes `.vercel/output` (see Deploying) |
+
+## Deploying (Vercel)
+
+The browser only calls its own origin, so the deployment must forward `/v1` and `/openapi` to the API. `vercel.json` rewrites cannot read environment variables, so on Vercel `npm run build` runs `scripts/vercel-output.mjs`, which packages `dist/` as a Build Output API bundle with those routes (plus the security headers and SPA fallback) pointed at `SBQR_API_URL`.
+
+1. In Vercel, Project Settings → Environment Variables, set `SBQR_API_URL` for each environment, e.g. `https://rvl-sbqr-api-dev.fly.dev` (https origin only, no path). The build fails if it is missing or malformed.
+2. Deploy as usual. Changing the API host means changing the variable and redeploying.
+
+To inspect the generated bundle locally, after a build run `SBQR_API_URL=https://rvl-sbqr-api-dev.fly.dev node scripts/vercel-output.mjs --force` (output goes to the git-ignored `.vercel/output`).
 
 ## Status
 
