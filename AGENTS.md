@@ -40,3 +40,11 @@ Commit inside this repo only. Branch off `main`. Follow the workspace convention
 
 - `design/portal-prototype.html`: clickable prototype of every screen with realistic flows (finalize blocked by queued usage, rate card validation, QR inspector, etc.). Match behaviour and copy.
 - `rvl-sbqr-admin-portal`: existing staff-only app; port Tenants, Crypto keys and QR inspector from it, mapping its colours to the tokens here.
+
+## Browser testing (agent-browser)
+
+Use the `agent-browser` skill (`.claude/skills/agent-browser`) to drive the running app. One-time machine setup: `npm i -g agent-browser && agent-browser install`. The skill is a stub; load the real workflow with `agent-browser skills get core` (and `skills get dogfood` for exploratory QA).
+
+- Start `npm run dev`, then `agent-browser open http://localhost:5175`. Sign-in needs the backend (`SBQR_API_URL`); without it only the login screen renders.
+- Never put real credentials in commands, logs or committed files. Use `agent-browser auth` / state files kept outside the repo.
+- Browser checks do not replace `npm run lint`, `npm test` and `npm run build`.
