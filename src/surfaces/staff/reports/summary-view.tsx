@@ -2,9 +2,9 @@ import { Building2, CreditCard, Download, Printer, QrCode } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bdt, count, monthShort, percent, percentSigned, periodName } from '../../../shared/format'
-import { draftPeriod, type Period } from '../../../shared/billing/billing'
+import { draftPeriod, type Period, type BillingData } from '../../../shared/billing/billing'
 import { PeriodPicker } from '../../../shared/billing/period-picker'
-import { useBilling } from '../../../shared/billing/store'
+import { BillingGate } from '../billing/billing-gate'
 import { downloadText } from '../../../shared/download'
 import { Banner, Button, Card, CardHeader, EmptyRow, Kpi, StatusChip, Table, Td, Th, Tr, toast } from '../../../shared/ui'
 import { monthlyReport, reportToCsv } from './report'
@@ -14,7 +14,10 @@ import { monthlyReport, reportToCsv } from './report'
  * UI only: reads the in-memory billing store. Print and CSV stand in for the API's exports.
  */
 export function SummaryView() {
-  const billing = useBilling()
+  return <BillingGate>{(billing) => <SummaryViewBody billing={billing} />}</BillingGate>
+}
+
+function SummaryViewBody({ billing }: { billing: BillingData }) {
   const [period, setPeriod] = useState<Period>(() => draftPeriod(billing) ?? billing.periods[billing.periods.length - 1])
   const report = monthlyReport(billing, period)
   const nameOf = (id: string) => billing.institutions.find((i) => i.id === id)?.name ?? id

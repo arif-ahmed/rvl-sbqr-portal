@@ -1,9 +1,8 @@
 import {
+  blockingEvents,
   buildStatement,
   pendingAdjustments,
   periodTotals,
-  queuedEvents,
-  rateCardFor,
   round2,
   type BillingData,
   type Period,
@@ -61,10 +60,7 @@ export function monthlyReport(data: BillingData, period: Period): MonthlyReport 
     }))
     .sort((a, b) => b.revenue - a.revenue)
 
-  const unbilled = data.institutions.flatMap((i) => {
-    const counts = data.counts[i.id]?.[period]
-    return counts && !rateCardFor(data.rateCards, i.id, period) ? [{ institutionId: i.id, volume: volumeOf(counts) }] : []
-  })
+  const unbilled = Object.entries(data.unbilled[period] ?? {}).map(([institutionId, volume]) => ({ institutionId, volume }))
 
   const index = data.periods.indexOf(period)
   const previous = index > 0 ? data.periods[index - 1] : null
@@ -82,7 +78,7 @@ export function monthlyReport(data: BillingData, period: Period): MonthlyReport 
       ? { volume: changeOf(volume, volumeOf(before.counts)), revenue: changeOf(revenue, before.total) }
       : { volume: null, revenue: null },
     pendingAdjustments: pendingAdjustments(data, period).length,
-    lateUsage: queuedEvents(data, period).length,
+    lateUsage: blockingEvents(data, period).length,
   }
 }
 
@@ -118,12 +114,12 @@ export function institutionReport(data: BillingData, institutionId: string, peri
   const month = monthlyReport(data, period)
   const place = month.rows.findIndex((r) => r.institutionId === institutionId)
   const statement = buildStatement(data, institutionId, period)
-  const counts = data.counts[institutionId]?.[period]
 
   const index = data.periods.indexOf(period)
   const rows = data.periods.slice(Math.max(0, index - 6), index + 1).map((p) => {
-    const c = data.counts[institutionId]?.[p] ?? noCounts
-    return { period: p, status: data.periodMeta[p].status, counts: c, volume: volumeOf(c), revenue: buildStatement(data, institutionId, p)?.total ?? 0 }
+    const s = buildStatement(data, institutionId, p)
+    const c = s?.counts ?? noCounts
+    return { period: p, status: data.periodMeta[p].status, counts: c, volume: volumeOf(c), revenue: s?.total ?? 0 }
   })
   const history = rows.map((r, i) => ({ ...r, change: i > 0 ? changeOf(r.revenue, rows[i - 1].revenue) : null })).slice(-6)
 
@@ -131,7 +127,7 @@ export function institutionReport(data: BillingData, institutionId: string, peri
     period,
     status: month.status,
     statement,
-    unbilledVolume: counts && !statement ? volumeOf(counts) : 0,
+    unbilledVolume: data.unbilled[period]?.[institutionId] ?? 0,
     rank: place >= 0 ? place + 1 : null,
     of: month.rows.length,
     share: place >= 0 ? month.rows[place].share : 0,

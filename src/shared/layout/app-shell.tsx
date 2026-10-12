@@ -1,5 +1,5 @@
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { LogOut, Menu as MenuIcon, QrCode, SunMoon, type LucideIcon } from 'lucide-react'
+import { KeyRound, LogOut, Menu as MenuIcon, QrCode, SunMoon, type LucideIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { signOut, type Session, type Surface } from '../auth/session'
@@ -65,7 +65,7 @@ export function AppShell(props: { surface: Surface; session: Session; nav: NavIt
           <button
             className={cn(linkBase, 'w-full hover:bg-side-2 hover:text-white')}
             onClick={() => {
-              signOut()
+              void signOut()
               navigate('/login')
             }}
           >
@@ -104,12 +104,18 @@ export function AppShell(props: { surface: Surface; session: Session; nav: NavIt
               <Menu.Content align="end" sideOffset={8} className="z-50 min-w-56 overflow-hidden rounded-xl border border-line bg-surface shadow-lg">
                 <div className="border-b border-line px-4 py-3">
                   <b>{session.name}</b>
-                  <div className="text-[12.5px] text-text-3">{session.userId}</div>
+                  <div className="text-[12.5px] text-text-3">{session.username}</div>
                 </div>
                 <Menu.Item
                   className="flex cursor-pointer items-center gap-2.5 px-4 py-2.5 outline-none data-[highlighted]:bg-surface-2"
+                  onSelect={() => navigate('/change-password')}
+                >
+                  <KeyRound className="size-4" aria-hidden /> Change password
+                </Menu.Item>
+                <Menu.Item
+                  className="flex cursor-pointer items-center gap-2.5 px-4 py-2.5 outline-none data-[highlighted]:bg-surface-2"
                   onSelect={() => {
-                    signOut()
+                    void signOut()
                     navigate('/login')
                   }}
                 >

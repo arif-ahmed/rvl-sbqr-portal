@@ -61,9 +61,9 @@ describe('rate card rules', () => {
     }
   })
 
-  it('refuses a start in the current or a past month', () => {
+  it('accepts a start in the current month but refuses a past one', () => {
     const base = { institutionId: 'a', generationRate: '0.5', validationRate: '0.1' }
-    expect(rateCardSchema.safeParse({ ...base, startMonth: currentMonth() }).success).toBe(false)
+    expect(rateCardSchema.safeParse({ ...base, startMonth: currentMonth() }).success).toBe(true)
     expect(rateCardSchema.safeParse({ ...base, startMonth: '2020-01' }).success).toBe(false)
     expect(rateCardSchema.safeParse({ ...base, startMonth: '' }).success).toBe(false)
   })

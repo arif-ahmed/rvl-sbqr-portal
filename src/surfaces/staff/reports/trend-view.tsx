@@ -1,13 +1,17 @@
 import { Download, Printer } from 'lucide-react'
 import { bdt, count, monthShort, percentSigned, periodName } from '../../../shared/format'
-import { useBilling } from '../../../shared/billing/store'
+import type { BillingData } from '../../../shared/billing/billing'
+import { BillingGate } from '../billing/billing-gate'
 import { downloadText } from '../../../shared/download'
 import { BarChart, Button, Card, CardHeader, StatusChip, Table, Td, Th, Tr } from '../../../shared/ui'
 import { trendReport, trendToCsv } from './report'
 
 /** Revenue and volume month by month, with each institution's part. UI only. */
 export function TrendView() {
-  const billing = useBilling()
+  return <BillingGate>{(billing) => <TrendViewBody billing={billing} />}</BillingGate>
+}
+
+function TrendViewBody({ billing }: { billing: BillingData }) {
   const trend = trendReport(billing)
   const nameOf = (id: string) => billing.institutions.find((i) => i.id === id)?.name ?? id
   const rows = [...trend.rows].reverse()

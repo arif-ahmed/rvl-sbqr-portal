@@ -1,18 +1,21 @@
 import { ChevronLeft, Download, Printer } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { buildStatement, earlierStatements, statementToCsv } from '../../../shared/billing/billing'
+import { buildStatement, earlierStatements, statementToCsv, type BillingData } from '../../../shared/billing/billing'
 import { StatementDocument } from '../../../shared/billing/statement-document'
-import { useBilling } from '../../../shared/billing/store'
 import { downloadText } from '../../../shared/download'
 import { Button } from '../../../shared/ui'
+import { BillingGate } from '../billing/billing-gate'
 
 /**
  * A statement as the bill itself: a paper preview with Download PDF (the browser's print dialog,
- * "Save as PDF") and Download CSV. UI only: the API will render the same content server-side.
+ * "Save as PDF") and Download CSV, both made from the API's statement.
  */
 export function StatementPage() {
+  return <BillingGate>{(billing) => <StatementBody billing={billing} />}</BillingGate>
+}
+
+function StatementBody({ billing }: { billing: BillingData }) {
   const { period = '', institutionId = '' } = useParams()
-  const billing = useBilling()
   const institution = billing.institutions.find((i) => i.id === institutionId)
   const meta = billing.periodMeta[period]
   const statement = institution && meta ? buildStatement(billing, institutionId, period) : null
@@ -40,7 +43,7 @@ export function StatementPage() {
         earlier={earlierStatements(billing, institutionId, period)}
       />
       <p className="mx-auto mt-3 max-w-[794px] text-[12.5px] text-text-3 print:hidden">
-        Download PDF opens your browser’s print dialog: choose “Save as PDF”. Daily usage and results by outcome arrive with the usage ledger.
+        Download PDF opens your browser’s print dialog: choose “Save as PDF”.
       </p>
     </>
   )

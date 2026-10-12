@@ -72,13 +72,13 @@ export const canWithdraw = (card: RateCard, cards: RateCard[], now = new Date())
 /** A per-call price as form text: BDT, up to 4 decimals, zero allowed. Shared by the Rates drawer and onboarding. */
 export const price = z.string().trim().regex(/^\d+(\.\d{1,4})?$/, 'Enter a price in BDT with up to 4 decimals.')
 
-/** A price starts on the 1st of a month, and only a future month. The form holds prices as text. */
+/** A price starts on the 1st of a month, and the current or a future month. The form holds prices as text. */
 export const rateCardSchema = z.object({
   institutionId: z.string().min(1, 'Choose an institution.'),
   startMonth: z
     .string()
     .regex(/^\d{4}-\d{2}$/, 'Choose the month the price starts.')
-    .refine((m) => m > currentMonth(), 'The price must start in a future month.'),
+    .refine((m) => m >= currentMonth(), 'The price must start in the current or a future month.'),
   generationRate: price,
   validationRate: price,
 })

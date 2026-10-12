@@ -1,9 +1,7 @@
 import { Building2, CreditCard, FileText, Flag, Home, KeyRound, PlusCircle, QrCode } from 'lucide-react'
-import type { Role } from '../../shared/auth/session'
 import type { NavItem } from '../../shared/layout/app-shell'
 
 // One list drives both the sidebar and the routes, so they cannot drift apart.
-// Admin is the highest role: it sees everything Finance sees, plus the platform screens.
 const base: NavItem[] = [
   { to: '/staff/overview', label: 'Overview', icon: Home },
   { to: '/staff/institutions', label: 'Institutions', icon: Building2 },
@@ -23,4 +21,4 @@ const platform: NavItem[] = [
   { to: '/staff/inspector', label: 'QR inspector', icon: QrCode },
 ]
 
-export const staffNav = (role: Role): NavItem[] => (role === 'finance' ? [...base, ...billing] : [...base, ...billing, ...platform])
+export const staffNav = (): NavItem[] => [...base, ...billing, ...platform]

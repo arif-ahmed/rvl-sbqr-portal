@@ -2,30 +2,29 @@ import { CreditCard, QrCode, ScanLine } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { buildStatement, draftPeriod, type Period } from '../../shared/billing/billing'
 import { PeriodPicker } from '../../shared/billing/period-picker'
-import { useBilling } from '../../shared/billing/store'
 import { bdt, count, monthShort, periodName } from '../../shared/format'
 import { BarChart, Card, CardHeader, Kpi, StatusChip } from '../../shared/ui'
-import { sampleEvents, sampleFiInstitutionId } from '../../shared/usage/sample'
-import { eventPeriod } from '../../shared/usage/usage'
+import type { Session } from '../../shared/auth/session'
+import { lastDayOf } from '../../shared/usage/api/mappers'
 import { UsageTable } from '../../shared/usage/usage-table'
-
-// UI only: until the API exists the FI user is a fixed sample institution.
-const institutionId = sampleFiInstitutionId
-const allEvents = sampleEvents.filter((e) => e.institutionId === institutionId)
+import { FiGate, type FiBilling } from './fi-gate'
 
 /**
  * What this institution used, one billing period at a time: totals per operation, the months
  * side by side, and every event of the month. The totals are what the statement bills.
  */
-export function UsagePage() {
-  const billing = useBilling()
+export function UsagePage({ session }: { session: Session }) {
+  return <FiGate session={session}>{(data, institutionId) => <UsageBody data={data} institutionId={institutionId} />}</FiGate>
+}
+
+function UsageBody({ data, institutionId }: { data: FiBilling; institutionId: string }) {
+  const { billing, usage } = data
   const [params, setParams] = useSearchParams()
   const asked = params.get('period')
   const period: Period = asked && billing.periodMeta[asked] ? asked : (draftPeriod(billing) ?? billing.periods[billing.periods.length - 1])
   const status = billing.periodMeta[period].status
-  const counts = billing.counts[institutionId]?.[period]
+  const counts = usage[period]?.[institutionId]
   const statement = buildStatement(billing, institutionId, period)
-  const events = allEvents.filter((e) => eventPeriod(e) === period)
 
   return (
     <>
@@ -72,19 +71,19 @@ export function UsagePage() {
           <BarChart
             label="Billed calls by month, generations and validations"
             data={billing.periods.map((p) => {
-              const c = billing.counts[institutionId]?.[p]
+              const c = usage[p]?.[institutionId]
               return {
                 label: monthShort(p),
                 a: (c?.staticGenerations ?? 0) + (c?.dynamicGenerations ?? 0),
                 b: c?.validations ?? 0,
-                draft: billing.periodMeta[p].status === 'Draft',
+                draft: billing.periodMeta[p].status !== 'Finalized',
               }
             })}
           />
         </div>
       </Card>
 
-      <UsageTable events={events} dates={false} csvName={`usage-${period}.csv`} />
+      <UsageTable key={period} scope={{ kind: 'fi' }} range={{ from: `${period}-01`, to: lastDayOf(period) }} dates={false} csvName={`usage-${period}.csv`} />
     </>
   )
 }

@@ -1,45 +1,47 @@
 import { Download } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { errorMessage } from '../api/client'
 import { downloadText } from '../download'
-import { Button, Card, EmptyRow, Input, Pager, Select, StatusChip, Table, Td, Th, Tr, toast } from '../ui'
+import { Banner, Button, Card, EmptyRow, Input, Select, StatusChip, Table, Td, Th, Tr, toast } from '../ui'
+import { useUsageEvents, type UsageScope } from './api/hooks'
 import { EventPanel } from './event-panel'
-import { billingReason, eventsToCsv, filterEvents, formatEventTime, hasFilters, meterLabel, meters, noFilters, verdictLabel, type UsageEvent, type UsageFilters } from './usage'
-
-const PER_PAGE = 12
+import { billingReason, eventsToCsv, formatEventTime, hasFilters, meterLabel, meters, noFilters, verdictLabel, type UsageEvent, type UsageFilters } from './usage'
 
 /**
- * Usage events with filters, paging and CSV export. Shared by the FI and staff surfaces.
- * Pass `institutionName` to add an Institution column (staff view). Pass `dates={false}` when
- * the caller already limits the events to one billing period, so a date range would be noise.
- * `csvName` names the exported file.
+ * Usage events, newest first, read from the API a page at a time. The filters are the API's: meter,
+ * billed or not, and a date range inside `range` (Dhaka days, inclusive). Shared by the FI and staff
+ * surfaces. Pass `institutionName` to add an Institution column (staff, all institutions). Pass
+ * `dates={false}` when the caller already limits the events to one billing period, so a date range
+ * would be noise. `csvName` names the exported file, which holds the events loaded so far.
  */
 export function UsageTable({
-  events,
+  scope,
+  range,
   institutionName,
   dates = true,
   csvName = 'usage.csv',
 }: {
-  events: UsageEvent[]
+  scope: UsageScope
+  range: { from: string; to: string }
   institutionName?: (id: string) => string
   dates?: boolean
   csvName?: string
 }) {
   const [filters, setFilters] = useState<UsageFilters>(noFilters)
-  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<UsageEvent | null>(null)
-  const rows = useMemo(() => filterEvents(events, filters), [events, filters])
-  const lastPage = Math.max(1, Math.ceil(rows.length / PER_PAGE))
-  const current = Math.min(page, lastPage)
-  const shown = rows.slice((current - 1) * PER_PAGE, current * PER_PAGE)
+  const query = useUsageEvents(scope, {
+    from: filters.from || range.from,
+    to: filters.to || range.to,
+    meter: filters.meter,
+    billable: filters.billing === '' ? undefined : filters.billing === 'billable',
+  })
+  const { events } = query
   const cols = institutionName ? 7 : 6
 
-  const change = (patch: Partial<UsageFilters>) => {
-    setFilters((f) => ({ ...f, ...patch }))
-    setPage(1)
-  }
+  const change = (patch: Partial<UsageFilters>) => setFilters((f) => ({ ...f, ...patch }))
   const exportCsv = () => {
-    downloadText(csvName, eventsToCsv(rows))
-    toast.success(`${rows.length} events exported`)
+    downloadText(csvName, eventsToCsv(events))
+    toast.success(`${events.length} events exported`)
   }
 
   return (
@@ -62,11 +64,11 @@ export function UsageTable({
           <>
             <label className="flex items-center gap-2 text-[13px] text-text-2">
               From
-              <Input type="date" aria-label="From date" className="w-auto" value={filters.from} max={filters.to || undefined} onChange={(e) => change({ from: e.target.value })} />
+              <Input type="date" aria-label="From date" className="w-auto" value={filters.from} min={range.from} max={filters.to || range.to} onChange={(e) => change({ from: e.target.value })} />
             </label>
             <label className="flex items-center gap-2 text-[13px] text-text-2">
               To
-              <Input type="date" aria-label="To date" className="w-auto" value={filters.to} min={filters.from || undefined} onChange={(e) => change({ to: e.target.value })} />
+              <Input type="date" aria-label="To date" className="w-auto" value={filters.to} min={filters.from || range.from} max={range.to} onChange={(e) => change({ to: e.target.value })} />
             </label>
           </>
         )}
@@ -76,10 +78,18 @@ export function UsageTable({
           </Button>
         )}
         <span className="flex-1" />
-        <Button onClick={exportCsv} disabled={rows.length === 0}>
+        <Button onClick={exportCsv} disabled={events.length === 0}>
           <Download className="size-4" aria-hidden /> Export CSV
         </Button>
       </div>
+
+      {query.error && (
+        <div className="p-4 pb-0">
+          <Banner tone="bad" title="Could not load usage events">
+            {errorMessage(query.error)}
+          </Banner>
+        </div>
+      )}
 
       <Table>
         <thead>
@@ -94,8 +104,11 @@ export function UsageTable({
           </tr>
         </thead>
         <tbody>
-          {shown.length === 0 && <EmptyRow cols={cols} title="No events match" hint={dates ? 'Adjust the filters or date range.' : 'Adjust the filters or pick another month.'} />}
-          {shown.map((e) => {
+          {query.isPending && !query.error && <EmptyRow cols={cols} title="Loading events…" />}
+          {!query.isPending && events.length === 0 && (
+            <EmptyRow cols={cols} title="No events match" hint={dates ? 'Adjust the filters or date range.' : 'Adjust the filters or pick another month.'} />
+          )}
+          {events.map((e) => {
             const reason = billingReason(e)
             return (
               // The event ID is the real button for keyboard and screen readers; the row click is the mouse shortcut.
@@ -127,9 +140,15 @@ export function UsageTable({
           })}
         </tbody>
       </Table>
-      <Pager total={rows.length} page={current} perPage={PER_PAGE} onPage={setPage} />
+      {query.hasMore && (
+        <div className="border-t border-line p-3 text-center">
+          <Button disabled={query.isLoadingMore} onClick={() => query.loadMore()}>
+            {query.isLoadingMore ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      )}
       <p className="border-t border-line px-5 py-3 text-[12.5px] text-text-3">
-        Latest {events.length} events shown. Every completed check is billed, including rejections. Stale requests are listed but not billed; replayed and failed requests are not recorded. Select an event to see why.
+        {events.length} {events.length === 1 ? 'event' : 'events'} shown, newest first. Every completed check is billed, including rejections. Stale requests are listed but not billed; replayed and failed requests are not recorded. Select an event to see why.
       </p>
       <EventPanel event={selected} institutionName={institutionName} onClose={() => setSelected(null)} />
     </Card>
