@@ -102,6 +102,51 @@ export class FakeBackend {
     () => this.records.map((r) => r.tenant.tenantId),
     () => new Date(),
   )
+  /**
+   * Seed for GET /v1/trust-store/institutions — every institution the BB
+   * trust store has published, with public keys. Tests can overwrite this
+   * directly: `backend.trustStore = [...]` or call `setTrustStoreFailure(503)`
+   * to exercise the error path.
+   */
+  trustStore: { institutionCode: string; instituteType: string; institutionName: string; status: string; source: string; keyVersion: number; publicKeyPem: string; publicKeySha256: string; syncedAt: string }[] = [
+    {
+      institutionCode: '000010',
+      instituteType: '00',
+      institutionName: 'Agrani Bank PLC',
+      status: 'ACTIVE',
+      source: 'REGISTRY',
+      keyVersion: 1,
+      publicKeyPem: '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=\n-----END PUBLIC KEY-----',
+      publicKeySha256: 'a3f19c7b4e2a1b9c0e8d7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c',
+      syncedAt: '2026-10-12T04:00:00Z',
+    },
+    {
+      institutionCode: '022002',
+      instituteType: '02',
+      institutionName: 'bKash',
+      status: 'ACTIVE',
+      source: 'REGISTRY',
+      keyVersion: 3,
+      publicKeyPem: '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAqMWif47sImAnahuBCpOSs8UKZDoYaBoBYq8V1DVkt6I=\n-----END PUBLIC KEY-----',
+      publicKeySha256: '1f0e9d8c7b6a5948372615f4e3d2c1b0a99887766554433221100ffeeddccbba',
+      syncedAt: '2026-10-12T04:00:00Z',
+    },
+    {
+      institutionCode: '031008',
+      instituteType: '03',
+      institutionName: 'Pathao Pay',
+      status: 'SUSPENDED',
+      source: 'REGISTRY',
+      keyVersion: 2,
+      publicKeyPem: '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEArotatingKeyMaterialPlaceholder==\n-----END PUBLIC KEY-----',
+      publicKeySha256: 'cafe1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab',
+      syncedAt: '2026-10-12T04:00:00Z',
+    },
+  ]
+  /** Inject a one-shot failure for the next call to /v1/trust-store/institutions. */
+  setTrustStoreFailure(status = 503) {
+    this.failures.set('GET /v1/trust-store/institutions', status)
+  }
   /** Accounts the login endpoint knows. `master` / `secret` is always there. */
   readonly users = new Map<string, FakeUser>()
   /** Access token lifetime the API reports and enforces, in seconds. The real API issues 900. */
@@ -221,6 +266,13 @@ export class FakeBackend {
     if (billed) return billed
 
     if (pathname === '/v1/admin/institutions') return new Response(null, { status: 404 }) // the picker falls back to its built-in list
+    if (pathname === '/v1/trust-store/institutions' && method === 'GET') {
+      // The failure map already fired above if the test queued one — fall
+      // through to the success path only when it didn't. The syncedAt at
+      // the top level mirrors the manager response shape.
+      const syncedAt = this.trustStore.length === 0 ? null : this.trustStore.reduce((max, e) => (e.syncedAt > max ? e.syncedAt : max), this.trustStore[0].syncedAt)
+      return Response.json({ syncedAt, institutions: this.trustStore })
+    }
     if (pathname === '/v1/admin/tenants' && method === 'GET') {
       const params = new URL(url, 'http://fake').searchParams
       const page = Number(params.get('page') ?? 1)

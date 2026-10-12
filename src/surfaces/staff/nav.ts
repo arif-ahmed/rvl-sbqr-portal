@@ -1,10 +1,11 @@
-import { Building2, CreditCard, FileText, Flag, Home, KeyRound, PlusCircle, QrCode } from 'lucide-react'
+import { Building2, CreditCard, FileText, Flag, Home, KeyRound, PlusCircle, QrCode, ShieldCheck } from 'lucide-react'
 import type { NavItem } from '../../shared/layout/app-shell'
 
 // One list drives both the sidebar and the routes, so they cannot drift apart.
 const base: NavItem[] = [
   { to: '/staff/overview', label: 'Overview', icon: Home },
   { to: '/staff/institutions', label: 'Institutions', icon: Building2 },
+  { to: '/staff/trust-store', label: 'Trust store', icon: ShieldCheck },
 ]
 
 const billing: NavItem[] = [

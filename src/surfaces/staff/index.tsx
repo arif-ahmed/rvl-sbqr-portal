@@ -12,6 +12,7 @@ import { PeriodsPage } from './periods/periods-page'
 import { StatementPage } from './periods/statement-page'
 import { RatesPage } from './rates/rates-page'
 import { ReportsPage } from './reports/reports-page'
+import { TrustStorePage } from './trust-store/trust-store-page'
 
 // RVL staff screens (the platform admin). Reference: design/portal-prototype.html.
 // To build a screen: create it in this folder and swap it in for <ComingSoon /> below.
@@ -26,6 +27,7 @@ export default function StaffSurface({ session }: { session: Session }) {
   const page = (to: string, label: string) => {
     if (to === '/staff/overview') return <OverviewPage session={session} />
     if (to === '/staff/institutions') return <InstitutionsPage />
+    if (to === '/staff/trust-store') return <TrustStorePage />
     if (to === '/staff/rates') return <RatesPage />
     if (to === '/staff/periods') return <PeriodsPage session={session} />
     if (to === '/staff/adjustments') return <AdjustmentsPage session={session} />
