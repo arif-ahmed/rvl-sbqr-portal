@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { BarChart, Button, ConfirmDialog, Field, Input, StatusChip, toneFor } from '.'
+import { BarChart, Button, ConfirmDialog, ExpiryChip, Field, Input, StatusChip, toneFor } from '.'
 
 describe('shared ui', () => {
   it('maps statuses to tones', () => {
@@ -40,5 +40,24 @@ describe('shared ui', () => {
     )
     expect(screen.getByRole('img', { name: 'Calls' })).toBeInTheDocument()
     expect(screen.getByText('240k')).toBeInTheDocument()
+  })
+
+  // 2026-10-15 (cert-expiry workstream): ExpiryChip auto-pick rule
+  // (bad: past or null · warn: <= 30d · ok: further out) and the data-*
+  // hooks it exposes for tests / e2e.
+  it('picks tone automatically based on the deadline', () => {
+    const today = new Date()
+    const inDays = (n: number) => new Date(today.getTime() + n * 86_400_000).toISOString()
+    const { rerender } = render(<ExpiryChip validUntil={null} />)
+    expect(screen.getByTestId('expiry-chip')).toHaveAttribute('data-tone', 'bad')
+
+    rerender(<ExpiryChip validUntil={inDays(-1)} />) // yesterday
+    expect(screen.getByTestId('expiry-chip')).toHaveAttribute('data-tone', 'bad')
+
+    rerender(<ExpiryChip validUntil={inDays(7)} />) // within 30d
+    expect(screen.getByTestId('expiry-chip')).toHaveAttribute('data-tone', 'warn')
+
+    rerender(<ExpiryChip validUntil={inDays(200)} />) // comfortably future
+    expect(screen.getByTestId('expiry-chip')).toHaveAttribute('data-tone', 'ok')
   })
 })

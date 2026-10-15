@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import type { Blocker } from '../../../shared/api/client'
-import { Banner, Button, Card, Field, Input, StatusChip, SwitchRow, Textarea } from '../../../shared/ui'
+import { Banner, Button, Card, ExpiryChip, Field, Input, StatusChip, SwitchRow, Textarea } from '../../../shared/ui'
 import { useInstitutions } from '../institutions/api/hooks'
 import type { OnboardingDto } from '../institutions/api/types'
 import type { KeyMode, Profile } from '../institutions/types'
@@ -249,6 +249,10 @@ export function CredentialsStep(
 
 const pemSchema = z.string().refine((v) => /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----/.test(v.trim()), 'Paste a PEM private key.')
 
+const graceSchema = z.object({
+  gracePeriodMinutes: z.number().int().min(0, 'Use 0 or more minutes.').max(24 * 60, 'Use 24 hours (1440) or fewer.'),
+})
+
 /** Required: an institution cannot go live without an active signing key. */
 export function KeyStep(
   props: StepState & {
@@ -257,19 +261,78 @@ export function KeyStep(
     onBack: () => void
     onContinue: () => void
     onSubmit: (mode: KeyMode, privateKeyPem?: string) => void
+    /**
+     * Rotate the existing ACTIVE key — server-mints the next version,
+     * retires the current one, and stamps the retired row's validity
+     * window with the supplied grace period. Defaults to 60 minutes (the
+     * server's <c>KeyCustody:DefaultGraceMinutesOnRetire</c>); pass 0 for
+     * immediate cut-over (in-flight verifications against the retired
+     * key fail with SIGNING_KEY_EXPIRED).
+     */
+    onRotate: (gracePeriodMinutes: number) => void
+    rotating: boolean
   },
 ) {
-  const { existing, busy, error, onBack, onContinue, onSubmit } = props
+  const { existing, busy, error, onBack, onContinue, onSubmit, onRotate, rotating } = props
   const [mode, setMode] = useState<KeyMode>('Generate')
   const [pem, setPem] = useState('')
   const [invalid, setInvalid] = useState('')
+  // When the user clicks "Rotate" we don't auto-submit — they get a small
+  // confirmation card with a grace-period input. <c>showRotate</c> flips
+  // the inline form open/closed; submitting it calls <c>onRotate</c>.
+  const [showRotate, setShowRotate] = useState(false)
+  const rotateForm = useForm<{ gracePeriodMinutes: number }>({
+    resolver: zodResolver(graceSchema),
+    defaultValues: { gracePeriodMinutes: 60 },
+  })
 
   if (existing) {
     return (
       <StepCard title="Signing key" text="Ed25519 key used to sign this institution's QR codes.">
-        <Banner tone="ok" title="Signing key active">
-          Key <span className="num">{existing.keyId}</span>, version {existing.version}.
-        </Banner>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <Banner tone="ok" title="Signing key active" className="flex-1">
+            Key <span className="num">{existing.keyId}</span>, version <span className="num">{existing.version}</span>.
+          </Banner>
+          <ExpiryChip validUntil={existing.validUntil ?? null} />
+        </div>
+        <p className="mb-4 text-[13px] text-text-2">
+          The new version (v<span className="num">{existing.version + 1}</span>) is server-generated — the old key
+          stays resolvable for in-flight verifications for the grace period you choose, then drops out of rotation.
+        </p>
+        {showRotate ? (
+          <form
+            onSubmit={rotateForm.handleSubmit((v) => {
+              onRotate(v.gracePeriodMinutes)
+              setShowRotate(false)
+            })}
+            className="mb-4 rounded-xl border border-line px-4 py-3.5"
+          >
+            <Field label="Grace period (minutes)" htmlFor="grace" error={rotateForm.formState.errors.gracePeriodMinutes?.message} hint="0 = immediate cut-over (in-flight verifications fail with SIGNING_KEY_EXPIRED). Default = 60.">
+              <Input
+                id="grace"
+                type="number"
+                min={0}
+                max={1440}
+                step={1}
+                aria-invalid={!!rotateForm.formState.errors.gracePeriodMinutes}
+                {...rotateForm.register('gracePeriodMinutes', { valueAsNumber: true })}
+              />
+            </Field>
+            <div className="mt-3 flex justify-end gap-2.5">
+              <Button type="button" onClick={() => setShowRotate(false)}>Cancel</Button>
+              <Button type="submit" variant="primary" disabled={rotating}>
+                {rotating ? 'Rotating…' : 'Rotate key'}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="mb-4 flex flex-wrap gap-2.5">
+            <Button type="button" onClick={() => setShowRotate(true)} disabled={busy || rotating}>
+              Rotate key…
+            </Button>
+          </div>
+        )}
+        <StepError error={error} />
         <Actions>
           <Button onClick={onBack}>Back</Button>
           <Button variant="primary" onClick={onContinue}>
@@ -332,12 +395,13 @@ export function KeyStep(
 
 // ---------------------------------------------------------------- Review
 
-function Row({ label, value, state }: { label: string; value: string; state: 'done' | 'todo' }) {
+function Row({ label, value, state, extra }: { label: string; value: string; state: 'done' | 'todo'; extra?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-line py-3 last:border-0">
-      <div>
+      <div className="min-w-0">
         <b className="block">{label}</b>
         <span className="text-[13px] text-text-2">{value}</span>
+        {extra}
       </div>
       <StatusChip status={state === 'done' ? 'Complete' : 'Pending'} />
     </div>
@@ -394,6 +458,7 @@ export function ReviewStep(
         label="Signing key"
         value={onboarding?.signingKey ? `Key ${onboarding.signingKey.keyId}, version ${onboarding.signingKey.version}` : 'Not created yet'}
         state={onboarding?.signingKey ? 'done' : 'todo'}
+        extra={onboarding?.signingKey ? <div className="mt-1.5"><ExpiryChip validUntil={onboarding.signingKey.validUntil ?? null} /></div> : null}
       />
       <Blockers blockers={blockers} />
       {onboarding && !onboarding.hasRateCard && (

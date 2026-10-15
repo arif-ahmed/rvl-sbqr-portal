@@ -18,6 +18,12 @@ type Rec = {
   configSaved: boolean
   credential: { clientId: string } | null
   signingKey: boolean
+  /** An ACTIVE row exists but its validUntil has passed: reads say "no key", mint says 409, rotate works. */
+  keyExpired?: boolean
+  /** Current ACTIVE version + its validity deadline (UTC ISO-8601). Mutated by the
+   *  fake crypto-key endpoints so the rotate form has something to verify against. */
+  signingKeyVersion: number
+  signingKeyValidUntil: string | null
   hasRateCard: boolean
   /** Per-tenant rate cards, newest EffectiveFrom first — matches the server's order. */
   rateCards: RateCardDto[]
@@ -63,7 +69,7 @@ function tenant(id: string, name: string, code: string, status: string, contact:
 // `blank` is a factory so every record starts with a fresh `rateCards` array —
 // otherwise `rec.rateCards.unshift(...)` in `addRateCard` would mutate the shared
 // reference and bleed across tests.
-const blank = () => ({ configSaved: false, credential: null, signingKey: false, hasRateCard: false, rateCards: [] as RateCardDto[], trust: true })
+const blank = () => ({ configSaved: false, credential: null, signingKey: false, signingKeyVersion: 0, signingKeyValidUntil: null, hasRateCard: false, rateCards: [] as RateCardDto[], trust: true })
 
 const rateCard = (tenantId: string, effectiveFrom: string, generationRate: number, validationRate: number): RateCardDto => ({
   rateCardId: newRateCardId(),
@@ -80,13 +86,13 @@ function seed(): Rec[] {
   const now = TEST_NOW
   const year = now.getFullYear()
   return [
-    { ...blank(), tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-1', ymd(year, 1), 0.5, 0.125), rateCard('inst-1', `${nextMonth()}-01`, 0.45, 0.12)] },
-    { ...blank(), tenant: tenant('inst-2', 'Karnaphuli Trust Bank', '000902', 'ACTIVE', 'Sabina Yasmin', 'sabina@karnaphulitrust.example'), configSaved: true, credential: { clientId: '000902-b40e5a11' }, signingKey: true, hasRateCard: true, rateCards: [rateCard('inst-2', ymd(year, 1), 0.5, 0.125)] },
-    { ...blank(), tenant: tenant('inst-3', 'Teesta Digital Wallet', '022901', 'ACTIVE', 'Nusrat Jahan', 'nusrat@teestawallet.example', { gen: false, val: true }), configSaved: true, credential: { clientId: '022901-e93b6f48' }, signingKey: true },
+    { ...blank(), tenant: tenant('inst-1', 'Shapla Commercial Bank', '000901', 'ACTIVE', 'Rafiq Ahmed', 'rafiq.ahmed@shaplabank.example'), configSaved: true, credential: { clientId: '000901-7c1d9e02' }, signingKey: true, signingKeyVersion: 1, signingKeyValidUntil: inDays(730), hasRateCard: true, rateCards: [rateCard('inst-1', ymd(year, 1), 0.5, 0.125), rateCard('inst-1', `${nextMonth()}-01`, 0.45, 0.12)] },
+    { ...blank(), tenant: tenant('inst-2', 'Karnaphuli Trust Bank', '000902', 'ACTIVE', 'Sabina Yasmin', 'sabina@karnaphulitrust.example'), configSaved: true, credential: { clientId: '000902-b40e5a11' }, signingKey: true, signingKeyVersion: 1, signingKeyValidUntil: inDays(730), hasRateCard: true, rateCards: [rateCard('inst-2', ymd(year, 1), 0.5, 0.125)] },
+    { ...blank(), tenant: tenant('inst-3', 'Teesta Digital Wallet', '022901', 'ACTIVE', 'Nusrat Jahan', 'nusrat@teestawallet.example', { gen: false, val: true }), configSaved: true, credential: { clientId: '022901-e93b6f48' }, signingKey: true, signingKeyVersion: 1, signingKeyValidUntil: inDays(730) },
     { ...blank(), tenant: tenant('inst-4', 'Surma Payments Ltd', '032901', 'PENDING', 'Jahid Hasan', 'jahid.hasan@surmapayments.example'), configSaved: true, credential: { clientId: '032901-3f9a1c20' } },
     { ...blank(), tenant: tenant('inst-5', 'Nilgiri Mercantile Bank', '000903', 'PENDING', 'Kamal Uddin', 'kamal.uddin@nilgirimercantile.example') },
-    { ...blank(), tenant: tenant('inst-6', 'Chandra Settlement Services', '042901', 'SUSPENDED', 'Mizanur Rahman', 'mizan@chandrasettlement.example'), configSaved: true, credential: { clientId: '042901-52d7c0aa' }, signingKey: true },
-    { ...blank(), tenant: tenant('inst-7', 'Doyel Co-operative Finance', '012901', 'TERMINATED', 'Farzana Akter', 'farzana@doyelfinance.example'), configSaved: true, credential: { clientId: '012901-9a08be37' }, signingKey: true },
+    { ...blank(), tenant: tenant('inst-6', 'Chandra Settlement Services', '042901', 'SUSPENDED', 'Mizanur Rahman', 'mizan@chandrasettlement.example'), configSaved: true, credential: { clientId: '042901-52d7c0aa' }, signingKey: true, signingKeyVersion: 1, signingKeyValidUntil: inDays(730) },
+    { ...blank(), tenant: tenant('inst-7', 'Doyel Co-operative Finance', '012901', 'TERMINATED', 'Farzana Akter', 'farzana@doyelfinance.example'), configSaved: true, credential: { clientId: '012901-9a08be37' }, signingKey: true, signingKeyVersion: 1, signingKeyValidUntil: inDays(730) },
   ]
 }
 
@@ -237,7 +243,7 @@ export class FakeBackend {
       blockers,
       configuration: { isQrGenerationAllowed: r.tenant.isQrGenerationAllowed, isQrValidationAllowed: r.tenant.isQrValidationAllowed },
       credential: r.credential ? { clientId: r.credential.clientId, status: 'ACTIVE', expiresAt: inDays(365) } : null,
-      signingKey: r.signingKey ? { keyId: `${r.tenant.institutionCode}-key`, version: 1, status: 'ACTIVE' } : null,
+      signingKey: r.signingKey ? { keyId: `${r.tenant.institutionCode}-key`, version: 1, status: 'ACTIVE', validUntil: inDays(730) } : null,
     }
   }
 
@@ -293,8 +299,87 @@ export class FakeBackend {
     if (pathname === '/v1/crypto-keys' && method === 'POST') {
       const r = this.find(String(b.tenantId))
       if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
+      if (r.keyExpired) return problem(409, 'Key exists', 'Tenant already has an ACTIVE signing key; use PUT to rotate instead.')
       r.signingKey = true
+      // New tenant-minted key: server picks version 1 if the tenant had none,
+      // otherwise it bumps. validUntil defaults to "now + DefaultValidityYears"
+      // on the server; here we mirror that with the same 730-day constant the
+      // onboarding view bakes in, unless the operator pinned a deadline.
+      r.signingKeyVersion = r.signingKeyVersion + 1
+      if (b.validUntil) r.signingKeyValidUntil = String(b.validUntil)
+      else r.signingKeyValidUntil = inDays(730)
       return Response.json({ tenantId: r.tenant.tenantId, status: 'ACTIVE' }, { status: 201 })
+    }
+    // GET /v1/crypto-keys/{id}/active — dedicated single-row endpoint consumed
+    // by useActiveCryptoKey. The ExpiryChip + rotate form on the institution
+    // detail page read this; 404 = no ACTIVE key (Pending tenant, or every key
+    // was revoked). The wire shape matches the real server's CryptoKeyDto.
+    if (method === 'GET' && /^\/v1\/crypto-keys\/[^/]+\/active$/.test(pathname)) {
+      const id = pathname.split('/')[3]
+      const r = this.find(id)
+      if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
+      if (!r.signingKey) return problem(404, 'No active key', 'This tenant has no ACTIVE signing key.')
+      return Response.json({
+        cryptoKeyId: `${r.tenant.institutionCode}-key-${r.signingKeyVersion}`,
+        tenantId: r.tenant.tenantId,
+        keyId: `${r.tenant.institutionCode}-key`,
+        keyVersion: r.signingKeyVersion,
+        publicKeyPem: '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=\n-----END PUBLIC KEY-----\n',
+        status: 'ACTIVE',
+        isActive: true,
+        createdAt: inDays(-30),
+        validUntil: r.signingKeyValidUntil,
+      })
+    }
+    // GET /v1/crypto-keys/{id} — paged history, every version. The newest is ACTIVE, earlier ones RETIRED.
+    if (method === 'GET' && /^\/v1\/crypto-keys\/[^/]+$/.test(pathname)) {
+      const r = this.find(pathname.split('/')[3])
+      if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
+      const count = r.signingKey || r.keyExpired ? r.signingKeyVersion : 0
+      const items = Array.from({ length: count }, (_, i) => {
+        const version = count - i
+        return {
+          cryptoKeyId: `${r.tenant.institutionCode}-key-${version}`,
+          tenantId: r.tenant.tenantId,
+          keyId: `${r.tenant.institutionCode}-key`,
+          keyVersion: version,
+          publicKeyPem: '',
+          status: version === count ? 'ACTIVE' : 'RETIRED',
+          isActive: version === count,
+          createdAt: inDays(-30 * (count - version)),
+          validUntil: version === count ? r.signingKeyValidUntil : inDays(-1),
+        }
+      })
+      return Response.json({ items, page: 1, pageSize: 20, totalCount: count, hasMore: false })
+    }
+    // PUT /v1/crypto-keys/{id} — rotate. The server mints a new ACTIVE row and
+    // retires the old one for the supplied grace period. We track just the
+    // ACTIVE version + its validUntil, which is what the chip + form read.
+    if (method === 'PUT' && /^\/v1\/crypto-keys\/[^/]+$/.test(pathname)) {
+      const id = pathname.split('/')[3]
+      const r = this.find(id)
+      if (!r) return problem(404, 'Tenant not found', 'No such tenant.')
+      if (!r.signingKey && !r.keyExpired) return problem(404, 'No active key', 'No ACTIVE signing key to rotate; use POST to mint one first.')
+      r.signingKey = true
+      r.keyExpired = false
+      r.signingKeyVersion = r.signingKeyVersion + 1
+      // The gracePeriodMinutes body field is accepted but doesn't change
+      // the active key's validUntil (it stamps the *retired* row). The
+      // optional newKeyValidUntil, however, overrides the active row's
+      // deadline.
+      if (b.newKeyValidUntil) r.signingKeyValidUntil = String(b.newKeyValidUntil)
+      else r.signingKeyValidUntil = inDays(730)
+      return Response.json({
+        cryptoKeyId: `${r.tenant.institutionCode}-key-${r.signingKeyVersion}`,
+        tenantId: r.tenant.tenantId,
+        keyId: `${r.tenant.institutionCode}-key`,
+        keyVersion: r.signingKeyVersion,
+        publicKeyPem: '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=\n-----END PUBLIC KEY-----\n',
+        status: 'ACTIVE',
+        isActive: true,
+        createdAt: inDays(0),
+        validUntil: r.signingKeyValidUntil,
+      })
     }
 
     // Rate-cards endpoints (mirrors RateCardsController). The page fans GETs out per tenant,

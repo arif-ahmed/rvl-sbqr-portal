@@ -55,3 +55,42 @@ export function periodName(period: string): string {
 export function monthShort(period: string): string {
   return MONTHS[Number(period.split('-')[1]) - 1].slice(0, 3)
 }
+
+/**
+ * Render an ISO 8601 timestamp as a human-readable UTC date: '15 March 2027'.
+ * The expiry chip and the signing-key cell use this so the day is unambiguous
+ * across timezones (the API stamps everything in UTC). Returns '—' when the
+ * input is null/undefined — the cert-expiry feature leaves the validity
+ * window open when an operator mints without an explicit deadline.
+ */
+export function expiryDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
+
+/**
+ * Days remaining until `iso` (UTC), ignoring the time-of-day. Negative when
+ * the deadline has passed. Used by <ExpiryChip> to pick its tone:
+ * <= 0 → 'bad' (expired), <= 30 → 'warn' (about to expire), otherwise 'ok'.
+ */
+export function daysUntil(iso: string | null | undefined, now: Date = new Date()): number | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  // Floor to UTC midnight so a "today" expiry reports 0, not -1.
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const target = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  return Math.round((target - today) / 86_400_000)
+}
+
+/** '12d', '3mo', '2yr'. Used by <ExpiryChip>. */
+export function daysUntilHuman(days: number): string {
+  if (days < 0) return `${-days}d overdue`
+  if (days === 0) return 'today'
+  if (days < 60) return `${days}d`
+  const months = Math.round(days / 30)
+  if (months < 24) return `${months}mo`
+  return `${Math.round(days / 365)}yr`
+}

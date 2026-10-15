@@ -12,12 +12,12 @@ const styles: Record<Tone, string> = {
 const icons = { ok: CheckCircle2, warn: AlertTriangle, bad: XCircle, info: Info }
 
 /** Title + one sentence + a link to the fix. */
-export function Banner({ tone, title, children }: { tone: Tone; title: string; children?: ReactNode }) {
+export function Banner({ tone, title, children, className }: { tone: Tone; title: string; children?: ReactNode; className?: string }) {
   const Icon = icons[tone]
   return (
     <div
       role={tone === 'bad' || tone === 'warn' ? 'alert' : 'status'}
-      className={cn('mb-4 flex items-start gap-3 rounded-xl border px-4 py-3.5', styles[tone])}
+      className={cn('mb-4 flex items-start gap-3 rounded-xl border px-4 py-3.5', styles[tone], className)}
     >
       <Icon className="mt-0.5 size-[18px] shrink-0" aria-hidden />
       <div>

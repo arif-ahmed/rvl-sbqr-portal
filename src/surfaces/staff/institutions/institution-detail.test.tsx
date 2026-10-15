@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -31,14 +31,17 @@ describe('institution detail', () => {
     open('inst-4')
     expect(await screen.findByText('3 of 5 done')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue setup' })).toBeInTheDocument()
-    expect(screen.getByText('No signing key yet.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generate new key' })).toBeInTheDocument()
   })
 
   it('shows the credential and signing key the API reports', async () => {
     open('inst-1')
     expect(await screen.findByText('000901-7c1d9e02')).toBeInTheDocument()
     expect(screen.getByText('Generation · Validation')).toBeInTheDocument()
-    expect(screen.getByText(/Key 000901-key, version 1/)).toBeInTheDocument()
+    // The signing-key card issues its own GET (useActiveCryptoKey) and
+    // shows "Loading…" until it resolves — await the testid so we read
+    // the rendered row, not the placeholder.
+    expect(await screen.findByTestId('signing-key-summary')).toHaveTextContent(/Key 000901-key, version 1/)
     expect(screen.getByText(/cannot be shown again/)).toBeInTheDocument()
   })
 
@@ -133,5 +136,77 @@ describe('institution detail', () => {
     backend.failNext('GET', '/v1/admin/tenants/inst-1', 500)
     open('inst-1')
     expect(await screen.findByText('Could not load this institution')).toBeInTheDocument()
+  })
+
+  it('renders the signing-key card with the expiry chip and rotate form', async () => {
+    open('inst-1')
+    // The expiry chip from useActiveCryptoKey should pick the "ok" tone for
+    // a 730-day future deadline. The key id/version come from the new card.
+    const chip = await screen.findByTestId('expiry-chip')
+    expect(chip).toHaveAttribute('data-tone', 'ok')
+    expect(screen.getByTestId('signing-key-summary')).toHaveTextContent(/Key 000901-key, version 1/)
+    expect(screen.getByRole('button', { name: 'Rotate key…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Expire now' })).not.toBeInTheDocument()
+  })
+
+  it('rotates from the detail page and bumps the version', async () => {
+    const user = open('inst-1')
+    await user.click(await screen.findByRole('button', { name: 'Rotate key…' }))
+    // Default grace period is 60. Submit.
+    const submit = await screen.findByRole('button', { name: 'Rotate key' })
+    await user.click(submit)
+    // The PUT went out with the right body shape and the chip refreshed to
+    // version 2 (the fake backend bumps version on PUT).
+    expect(backend.callsTo('PUT', '/v1/crypto-keys/inst-1')).toHaveLength(1)
+    expect(await screen.findByTestId('signing-key-summary')).toHaveTextContent(/Key 000901-key, version 2/)
+    expect(screen.getByTestId('expiry-chip')).toHaveAttribute('data-tone', 'ok')
+  })
+
+  it('lists every key version in the history drawer, newest first, with older ones retired', async () => {
+    const user = open('inst-1')
+    await user.click(await screen.findByRole('button', { name: 'Rotate key…' }))
+    await user.click(await screen.findByRole('button', { name: 'Rotate key' }))
+    await waitFor(() => expect(screen.getByTestId('signing-key-summary')).toHaveTextContent(/version 2/))
+    await user.click(screen.getByRole('button', { name: 'Key history' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Signing key history' })
+    const rows = await within(dialog).findAllByRole('row')
+    // header + v2 + v1
+    expect(rows).toHaveLength(3)
+    expect(rows[1]).toHaveTextContent(/v2.*Active/)
+    expect(rows[2]).toHaveTextContent(/v1.*Retired/)
+  })
+
+  it('replaces an expired key by rotating it, since the expired row is still ACTIVE', async () => {
+    const rec = backend.find('inst-1')!
+    rec.signingKey = false
+    rec.keyExpired = true
+    const user = open('inst-1')
+    await user.click(await screen.findByRole('button', { name: 'Generate new key' }))
+    expect(await screen.findByTestId('signing-key-summary')).toHaveTextContent(/version 2/)
+    expect(backend.callsTo('PUT', '/v1/crypto-keys/inst-1')).toHaveLength(1)
+    expect(backend.callsTo('POST', '/v1/crypto-keys')).toHaveLength(0)
+  })
+
+  it('offers a new key when the onboarding view reports a key but /active says it has expired', async () => {
+    const rec = backend.find('inst-1')!
+    rec.keyExpired = true
+    rec.signingKey = true
+    // Reads: onboarding still sees the key, /active returns 404.
+    backend.failNext('GET', '/v1/crypto-keys/inst-1/active', 404)
+    open('inst-1')
+    expect(await screen.findByRole('button', { name: 'Generate new key' })).toBeInTheDocument()
+    expect(screen.queryByText('No signing key yet.')).not.toBeInTheDocument()
+  })
+
+  it('mints a key when an Active institution has no key row at all, and stays Active', async () => {
+    backend.find('inst-1')!.signingKey = false
+    const user = open('inst-1')
+    expect(await screen.findByText('No valid signing key')).toBeInTheDocument()
+    // Still a live institution: no wizard, no Pending chip.
+    expect(screen.queryByText('Setup progress')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Generate new key' }))
+    expect(await screen.findByTestId('signing-key-summary')).toBeInTheDocument()
+    expect(backend.callsTo('POST', '/v1/crypto-keys')).toHaveLength(1)
+    expect(screen.queryByText('No valid signing key')).not.toBeInTheDocument()
   })
 })

@@ -2,15 +2,36 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../../shared/api/client'
-import { Banner, Card, EmptyRow, Input, Select, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
+import { Banner, Card, EmptyRow, ExpiryChip, Input, Select, StatusChip, Table, Td, Th, Tr } from '../../shared/ui'
 import { institutionNote } from './institutions/actions'
 import { ActionButtons } from './institutions/action-buttons'
 import { useInstitutionActions } from './institutions/use-institution-actions'
-import { useInstitutionList } from './institutions/api/hooks'
+import { useActiveCryptoKey, useInstitutionList } from './institutions/api/hooks'
 import type { InstitutionStatus } from './institutions/types'
 import { institutionTypes, typeLabel } from './onboarding/institution-types'
 
 const statuses: InstitutionStatus[] = ['Pending', 'Active', 'Suspended', 'Terminated']
+
+/**
+ * One cell of the institutions table. Renders either the ExpiryChip for the
+ * tenant's ACTIVE signing key, or "No key" for tenants that haven't minted
+ * one yet (or whose key was revoked and not yet replaced). The chip drives
+ * operator action: a 'warn' tone (within 30 days) or 'bad' tone (expired) is
+ * visible at a glance from the list.
+ */
+function SigningKeyCell({ tenantId }: { tenantId: string }) {
+  const key = useActiveCryptoKey(tenantId)
+  if (key.isPending) return <span className="text-text-3 text-[12.5px]">Loading…</span>
+  if (key.data == null) return <span className="text-text-3 text-[12.5px]">No key</span>
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-text-2 text-[12.5px]">
+        Key <span className="num">{key.data.keyId}</span> v<span className="num">{key.data.keyVersion}</span>
+      </span>
+      <ExpiryChip validUntil={key.data.validUntil ?? null} />
+    </div>
+  )
+}
 
 /** Institutions list, read from the tenants API. Lifecycle actions call the API and the list refetches. */
 export function InstitutionsPage() {
@@ -71,13 +92,14 @@ export function InstitutionsPage() {
               <Th>Type</Th>
               <Th>Code</Th>
               <Th>Access</Th>
+              <Th>Signing key</Th>
               <Th>Status</Th>
               <Th right>Actions</Th>
             </tr>
           </thead>
           <tbody>
-            {list.isPending && <EmptyRow cols={6} title="Loading institutions…" />}
-            {!list.isPending && !list.isError && rows.length === 0 && <EmptyRow cols={6} title="No institutions match" hint="Clear the search or filters." />}
+            {list.isPending && <EmptyRow cols={7} title="Loading institutions…" />}
+            {!list.isPending && !list.isError && rows.length === 0 && <EmptyRow cols={7} title="No institutions match" hint="Clear the search or filters." />}
             {rows.map((inst) => {
               const note = institutionNote(inst)
               return (
@@ -93,6 +115,9 @@ export function InstitutionsPage() {
                   <Td className="num">{inst.code}</Td>
                   <Td className="text-text-2">
                     {inst.access ? [inst.access.generation && 'Generation', inst.access.validation && 'Validation'].filter(Boolean).join(' · ') : 'Not set up'}
+                  </Td>
+                  <Td>
+                    <SigningKeyCell tenantId={inst.id} />
                   </Td>
                   <Td>
                     <StatusChip status={inst.status} />

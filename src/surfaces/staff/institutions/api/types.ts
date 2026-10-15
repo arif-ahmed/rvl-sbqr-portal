@@ -50,7 +50,35 @@ export type OnboardingDto = {
   blockers: Blocker[]
   configuration: { isQrGenerationAllowed: boolean; isQrValidationAllowed: boolean } | null
   credential: { clientId: string; status: string; expiresAt: string | null } | null
-  signingKey: { keyId: string; version: number; status: string } | null
+  /**
+   * The tenant's ACTIVE signing key — the Ed25519 private half held in the
+   * platform's vault. <c>validUntil</c> mirrors <c>crypto_keys.valid_until</c>
+   * so the wizard's "Signing key" step can render an ExpiryChip and surface a
+   * 30-day warning before rotation is required. <c>null</c> = open-ended
+   * validity (the pre-cert-expiry behaviour, preserved for back-compat).
+   */
+  signingKey: { keyId: string; version: number; status: string; validUntil: string | null } | null
+}
+
+/** GET /v1/crypto-keys/{tenantId} (paged history) and GET /v1/crypto-keys/{tenantId}/active. */
+export type CryptoKeyDto = {
+  cryptoKeyId: string
+  tenantId: string
+  keyId: string
+  keyVersion: number
+  publicKeyPem: string
+  status: string
+  isActive: boolean
+  createdAt: string
+  validUntil: string | null
+}
+
+export type PagedCryptoKeyDto = {
+  items: CryptoKeyDto[]
+  page: number
+  pageSize: number
+  totalCount: number
+  hasMore: boolean
 }
 
 /** POST /v1/admin/tenants/{id}/tenant-configuration. `clientSecret` is shown once and never stored. */

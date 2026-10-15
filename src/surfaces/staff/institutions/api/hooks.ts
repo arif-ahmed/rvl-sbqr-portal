@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { ApiError, apiGet, apiSend } from '../../../../shared/api/client'
 import type { Institution, KeyMode, Profile } from '../types'
 import { toInstitution, toRegisterRequest } from './mappers'
-import type { OnboardingDto, PagedTenantDto, ProvisionedCredentials, TenantDto } from './types'
+import type { CryptoKeyDto, OnboardingDto, PagedCryptoKeyDto, PagedTenantDto, ProvisionedCredentials, TenantDto } from './types'
 
 // TanStack Query bindings for the tenant onboarding API. Every write refetches the tenant list,
 // the tenant and its onboarding view before it resolves, so the screen that comes next never
@@ -11,8 +11,10 @@ import type { OnboardingDto, PagedTenantDto, ProvisionedCredentials, TenantDto }
 const tenantsKey = ['tenants'] as const
 const tenantKey = (id: string) => ['tenant', id] as const
 const onboardingKey = (id: string) => ['onboarding', id] as const
+const activeCryptoKeyKey = (id: string) => ['crypto-key', 'active', id] as const
 
 const base = '/v1/admin/tenants'
+const cryptoKeysBase = '/v1/crypto-keys'
 
 // ------------------------------------------------------------------ reads
 
@@ -107,9 +109,12 @@ export function useProvisionCredentials() {
 export function useCreateSigningKey() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, mode, privateKeyPem }: { id: string; mode: KeyMode; privateKeyPem?: string }) =>
-      apiSend('POST', '/v1/crypto-keys', { tenantId: id, mode, ...(mode === 'Adopt' ? { privateKeyPem } : {}) }),
-    onSuccess: (_data, { id }) => refresh(qc, id),
+    mutationFn: ({ id, mode, privateKeyPem, validUntil }: { id: string; mode: KeyMode; privateKeyPem?: string; validUntil?: string }) =>
+      apiSend('POST', '/v1/crypto-keys', { tenantId: id, mode, ...(mode === 'Adopt' ? { privateKeyPem } : {}), ...(validUntil ? { validUntil } : {}) }),
+    onSuccess: (_data, { id }) => {
+      refresh(qc, id)
+      qc.invalidateQueries({ queryKey: activeCryptoKeyKey(id) })
+    },
   })
 }
 
@@ -122,5 +127,76 @@ export function useTenantAction() {
     mutationFn: ({ id, action, reason }: { id: string; action: TenantAction; reason?: string }) =>
       apiSend<TenantDto>('POST', `${base}/${id}/${action}`, reason?.trim() ? { reason: reason.trim() } : undefined),
     onSuccess: (_data, { id }) => refresh(qc, id),
+  })
+}
+
+// ------------------------------------------------------------------ signing-key lifecycle
+
+/**
+ * The tenant's currently ACTIVE signing key (single row, by tenant id).
+ * Drives the ExpiryChip in the institutions list and the institutions detail
+ * page. <c>null</c> when the tenant has no ACTIVE key yet.
+ *
+ * <para>
+ * Hit: <c>GET /v1/crypto-keys/{tenantId}/active</c> — a dedicated single-row
+ * endpoint, not the paged history. The list page issues one per row; the
+ * detail page issues one alongside the onboarding view; both feed the same
+ * query key so the rotate mutation invalidates the right place.
+ * </para>
+ */
+export function useActiveCryptoKey(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: activeCryptoKeyKey(tenantId ?? ''),
+    enabled: !!tenantId,
+    queryFn: async () => {
+      try {
+        return await apiGet<CryptoKeyDto>(`${cryptoKeysBase}/${tenantId}/active`)
+      } catch (e) {
+        // 404 = no ACTIVE key (Pending tenant or a tenant that has been
+        // rotated into REVOKED). Surface as null so the cell renders
+        // "No key" rather than an error banner.
+        if (e instanceof ApiError && e.status === 404) return null
+        throw e
+      }
+    },
+  })
+}
+
+/**
+ * Rotate the tenant's ACTIVE signing key. PUT <c>/v1/crypto-keys/{tenantId}</c>
+ * with an optional <c>gracePeriodMinutes</c> (default 60, 0 = immediate
+ * cut-over) and an optional <c>newKeyValidUntil</c> override.
+ *
+ * <para>
+ * Invalidates the active-key query and the tenant's onboarding view so the
+ * wizard's "Signing key" step refreshes with the rotated row's
+ * <c>validUntil</c> on success. The same key is invalidated by
+ * <see cref="useCreateSigningKey"/> (POST) so a successful mint
+ * refreshes the chip too.
+ * </para>
+ */
+export function useRotateCryptoKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, gracePeriodMinutes, newKeyValidUntil }: { id: string; gracePeriodMinutes?: number; newKeyValidUntil?: string }) => {
+      const body: Record<string, unknown> = {}
+      if (gracePeriodMinutes !== undefined) body.gracePeriodMinutes = gracePeriodMinutes
+      if (newKeyValidUntil) body.newKeyValidUntil = newKeyValidUntil
+      return apiSend<CryptoKeyDto>('PUT', `${cryptoKeysBase}/${id}`, Object.keys(body).length ? body : undefined)
+    },
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: activeCryptoKeyKey(id) })
+      qc.invalidateQueries({ queryKey: onboardingKey(id) })
+      qc.invalidateQueries({ queryKey: tenantKey(id) })
+    },
+  })
+}
+
+/** Paged full history (every status) — used by the institution detail page. */
+export function useCryptoKeyHistory(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['crypto-key', 'history', tenantId ?? ''] as const,
+    enabled: !!tenantId,
+    queryFn: () => apiGet<PagedCryptoKeyDto>(`${cryptoKeysBase}/${tenantId}?page=1&pageSize=20`),
   })
 }

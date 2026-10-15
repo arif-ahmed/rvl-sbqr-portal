@@ -9,6 +9,7 @@ import {
   useOnboarding,
   useProvisionCredentials,
   useRegisterTenant,
+  useRotateCryptoKey,
   useSaveConfiguration,
   useTenantAction,
 } from '../institutions/api/hooks'
@@ -95,8 +96,9 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
   const saveConfiguration = useSaveConfiguration()
   const provision = useProvisionCredentials()
   const createKey = useCreateSigningKey()
+  const rotateKey = useRotateCryptoKey()
   const activate = useTenantAction()
-  const busy = [registerTenant, saveConfiguration, provision, createKey, activate].some((m) => m.isPending)
+  const busy = [registerTenant, saveConfiguration, provision, createKey, rotateKey, activate].some((m) => m.isPending)
 
   const index = steps.findIndex((s) => s.id === stepId)
   const goTo = (id: StepCode) => {
@@ -244,6 +246,18 @@ function Onboarding({ existing, startStep, capabilities }: { existing: Instituti
             setError(null)
             createKey.mutate({ id: tenantId, mode, privateKeyPem }, { onSuccess: () => go(1), onError: fail })
           }}
+          onRotate={(gracePeriodMinutes) => {
+            if (!tenantId) return
+            setError(null)
+            rotateKey.mutate(
+              { id: tenantId, gracePeriodMinutes },
+              {
+                onSuccess: () => toast.success(`Key rotated — v${onboarding?.signingKey?.version ?? '?'} retired, new version active.`),
+                onError: fail,
+              },
+            )
+          }}
+          rotating={rotateKey.isPending}
         />
       )}
       {stepId === 'REVIEW' && profile && (

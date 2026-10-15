@@ -10,6 +10,8 @@ import { ActionButtons } from './action-buttons'
 import { setupItems } from './actions'
 import { useInstitution, useOnboarding } from './api/hooks'
 import { InstitutionBillingTab } from './institution-billing'
+import { ExpiredSigningKeyCard } from './expired-signing-key-card'
+import { SigningKeyCard } from './signing-key-card'
 import { useInstitutionActions } from './use-institution-actions'
 
 function Facts({ rows }: { rows: [string, ReactNode][] }) {
@@ -159,9 +161,15 @@ export function InstitutionDetail({ tab = 'overview' }: { tab?: 'overview' | 'us
 
               <Card>
                 <CardHeader title="Signing key" />
-                <Empty>
-                  {signingKey ? `Key ${signingKey.keyId}, version ${signingKey.version} (${signingKey.status.toLowerCase()}). Held by the platform.` : onboarding ? 'No signing key yet.' : 'Loading…'}
-                </Empty>
+                {!onboarding ? (
+                  <Empty>Loading…</Empty>
+                ) : signingKey ? (
+                  <SigningKeyCard tenantId={inst.id} />
+                ) : inst.status === 'Terminated' ? (
+                  <Empty>No signing key.</Empty>
+                ) : (
+                  <ExpiredSigningKeyCard tenantId={inst.id} />
+                )}
               </Card>
             </div>
           </div>
